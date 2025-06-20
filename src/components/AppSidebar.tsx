@@ -13,11 +13,12 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { 
-  ChartPie, 
+  BarChart3, 
   Users, 
-  FileText, 
+  Package, 
   MessageSquare, 
-  Settings 
+  Settings, 
+  Wrench 
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -25,38 +26,44 @@ const menuItems = [
   {
     title: 'Dashboard',
     url: '/dashboard',
-    icon: ChartPie,
-    roles: ['super_admin', 'admin', 'user']
+    icon: BarChart3,
+    roles: ['super_admin', 'admin', 'user'],
+    color: 'text-blue-600'
   },
   {
     title: 'Stock',
     url: '/stock',
-    icon: FileText,
-    roles: ['super_admin', 'admin', 'user']
+    icon: Package,
+    roles: ['super_admin', 'admin', 'user'],
+    color: 'text-green-600'
   },
   {
     title: 'Employés',
     url: '/employees',
     icon: Users,
-    roles: ['super_admin', 'admin', 'user']
+    roles: ['super_admin', 'admin', 'user'],
+    color: 'text-purple-600'
   },
   {
     title: 'Maintenance',
     url: '/maintenance',
-    icon: Settings,
-    roles: ['super_admin', 'admin', 'user']
+    icon: Wrench,
+    roles: ['super_admin', 'admin', 'user'],
+    color: 'text-orange-600'
   },
   {
     title: 'Chat',
     url: '/chat',
     icon: MessageSquare,
-    roles: ['super_admin', 'admin', 'user']
+    roles: ['super_admin', 'admin', 'user'],
+    color: 'text-pink-600'
   },
   {
     title: 'Paramètres',
     url: '/settings',
     icon: Settings,
-    roles: ['super_admin', 'admin']
+    roles: ['super_admin', 'admin'],
+    color: 'text-gray-600'
   }
 ];
 
@@ -72,38 +79,47 @@ export function AppSidebar() {
 
   const isCollapsed = state === "collapsed";
   const isActive = (path: string) => currentPath === path;
-  const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive 
-      ? "bg-primary text-primary-foreground font-medium" 
-      : "hover:bg-muted/50 text-muted-foreground hover:text-foreground";
 
   return (
-    <Sidebar className={isCollapsed ? "w-14" : "w-64"} collapsible="icon">
-      <div className="p-4 border-b">
+    <Sidebar className={isCollapsed ? "w-16" : "w-64"} collapsible="icon">
+      <div className="p-4 border-b bg-gradient-to-r from-blue-600 to-purple-600">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-sm font-bold text-white">SS</span>
+          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+            <span className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">SS</span>
           </div>
           {!isCollapsed && (
             <div>
-              <h2 className="font-bold text-lg">Secure Stock</h2>
-              <p className="text-xs text-muted-foreground">Gestion opérationnelle</p>
+              <h2 className="font-bold text-lg text-white">Secure Stock</h2>
+              <p className="text-xs text-blue-100">Gestion opérationnelle</p>
             </div>
           )}
         </div>
       </div>
 
-      <SidebarContent>
+      <SidebarContent className="bg-white">
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-gray-500 font-semibold">
+            {!isCollapsed && 'Navigation'}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-2">
               {filteredMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavCls}>
-                      <item.icon className="h-4 w-4" />
-                      {!isCollapsed && <span>{item.title}</span>}
+                    <NavLink 
+                      to={item.url} 
+                      className={({ isActive }) => `
+                        flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200
+                        ${isActive 
+                          ? 'bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 text-blue-700 shadow-md' 
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:shadow-sm'
+                        }
+                      `}
+                    >
+                      <item.icon className={`h-5 w-5 ${isActive(item.url) ? 'text-blue-600' : item.color}`} />
+                      {!isCollapsed && (
+                        <span className="font-medium">{item.title}</span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -113,12 +129,19 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className="p-4 border-t mt-auto">
+      <div className="p-4 border-t mt-auto bg-gray-50">
         {!isCollapsed && user && (
           <div className="space-y-2">
-            <p className="text-sm font-medium">{user.name}</p>
-            <p className="text-xs text-muted-foreground">{user.role}</p>
-            <p className="text-xs text-muted-foreground">{user.department}</p>
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-bold">{user.name.charAt(0)}</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                <p className="text-xs text-gray-500">{user.role}</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">{user.department}</p>
           </div>
         )}
       </div>

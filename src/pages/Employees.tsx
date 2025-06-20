@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { Search, Plus, Edit, Trash2, Users } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Users, Calendar } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 // Données de démonstration
 const initialEmployees = [
@@ -42,7 +43,14 @@ const Employees = () => {
   const [employees, setEmployees] = useState(initialEmployees);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
+  const [newEmployee, setNewEmployee] = useState({
+    name: '',
+    department: '',
+    equipment: '',
+    assignDate: ''
+  });
   const { hasPermission } = useAuth();
+  const { toast } = useToast();
 
   const canModify = hasPermission('admin');
 
@@ -50,6 +58,44 @@ const Employees = () => {
     employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.department.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleAddEmployee = () => {
+    if (!newEmployee.name || !newEmployee.department) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir au moins le nom et le département",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const employee = {
+      id: Date.now().toString(),
+      name: newEmployee.name,
+      department: newEmployee.department,
+      assignedItems: newEmployee.equipment ? [{
+        parkNumber: newEmployee.equipment,
+        model: 'Équipement assigné',
+        assignDate: newEmployee.assignDate || new Date().toISOString().split('T')[0]
+      }] : []
+    };
+
+    setEmployees([...employees, employee]);
+    setNewEmployee({ name: '', department: '', equipment: '', assignDate: '' });
+    setIsAddEmployeeOpen(false);
+    toast({
+      title: "Succès",
+      description: "Employé ajouté avec succès"
+    });
+  };
+
+  const handleDeleteEmployee = (employeeId: string) => {
+    setEmployees(employees.filter(emp => emp.id !== employeeId));
+    toast({
+      title: "Succès",
+      description: "Employé supprimé avec succès"
+    });
+  };
 
   const getDepartmentStats = () => {
     const departments = employees.reduce((acc, emp) => {
@@ -62,40 +108,45 @@ const Employees = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Gestion des Employés</h1>
-        <p className="text-gray-600 mt-2">Gérez les employés et leurs équipements attribués</p>
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-xl shadow-lg">
+        <div className="flex items-center space-x-3">
+          <Users className="h-8 w-8" />
+          <div>
+            <h1 className="text-3xl font-bold">Gestion des Employés</h1>
+            <p className="text-purple-100 mt-2">Gérez les employés et leurs équipements attribués</p>
+          </div>
+        </div>
       </div>
 
       {/* Statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="border-2 border-gray-200 hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Employés</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{employees.length}</div>
+            <div className="text-2xl font-bold text-purple-600">{employees.length}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-2 border-gray-200 hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Départements</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{getDepartmentStats().length}</div>
+            <div className="text-2xl font-bold text-blue-600">{getDepartmentStats().length}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-2 border-gray-200 hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Équipements Attribués</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-green-600">
               {employees.reduce((total, emp) => total + emp.assignedItems.length, 0)}
             </div>
           </CardContent>
@@ -110,14 +161,14 @@ const Employees = () => {
             placeholder="Rechercher un employé..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 border-2 border-gray-200 focus:border-purple-500 rounded-lg"
           />
         </div>
         
         {canModify && (
           <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
                 <Plus className="h-4 w-4 mr-2" />
                 Nouvel employé
               </Button>
@@ -130,20 +181,50 @@ const Employees = () => {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="employeeName">Nom de l'employé</Label>
-                  <Input id="employeeName" placeholder="Ex: Marie Dupont" />
+                  <Input 
+                    id="employeeName" 
+                    placeholder="Ex: Marie Dupont"
+                    value={newEmployee.name}
+                    onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="department">Département</Label>
-                  <Input id="department" placeholder="Ex: Ressources Humaines" />
+                  <Input 
+                    id="department" 
+                    placeholder="Ex: Ressources Humaines"
+                    value={newEmployee.department}
+                    onChange={(e) => setNewEmployee({...newEmployee, department: e.target.value})}
+                  />
                 </div>
                 <div>
-                  <Label htmlFor="equipment">Équipements attribués</Label>
-                  <Input id="equipment" placeholder="Ex: PC001, SP001" />
+                  <Label htmlFor="equipment">Équipement attribué (optionnel)</Label>
+                  <Input 
+                    id="equipment" 
+                    placeholder="Ex: PC001"
+                    value={newEmployee.equipment}
+                    onChange={(e) => setNewEmployee({...newEmployee, equipment: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="assignDate">Date d'attribution</Label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input 
+                      id="assignDate" 
+                      type="date" 
+                      className="pl-10"
+                      value={newEmployee.assignDate}
+                      onChange={(e) => setNewEmployee({...newEmployee, assignDate: e.target.value})}
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Séparez les numéros de parc par des virgules
+                    Laissez vide pour utiliser la date actuelle
                   </p>
                 </div>
-                <Button className="w-full">Ajouter l'employé</Button>
+                <Button onClick={handleAddEmployee} className="w-full">
+                  Ajouter l'employé
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -151,14 +232,17 @@ const Employees = () => {
       </div>
 
       {/* Répartition par département */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Répartition par département</CardTitle>
+      <Card className="shadow-lg border-2 border-gray-200">
+        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-purple-600" />
+            Répartition par département
+          </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           <div className="flex flex-wrap gap-2">
             {getDepartmentStats().map(({ dept, count }) => (
-              <Badge key={dept} variant="outline">
+              <Badge key={dept} variant="outline" className="px-3 py-1 border-purple-200 text-purple-700">
                 {dept}: {count} employé{count > 1 ? 's' : ''}
               </Badge>
             ))}
@@ -169,20 +253,30 @@ const Employees = () => {
       {/* Liste des employés */}
       <div className="grid gap-4">
         {filteredEmployees.map(employee => (
-          <Card key={employee.id}>
-            <CardHeader>
+          <Card key={employee.id} className="shadow-lg border-2 border-gray-200 hover:shadow-xl transition-shadow">
+            <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg">{employee.name}</CardTitle>
-                  <CardDescription>{employee.department}</CardDescription>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-bold">{employee.name.charAt(0)}</span>
+                    </div>
+                    {employee.name}
+                  </CardTitle>
+                  <CardDescription className="text-purple-600 font-medium">{employee.department}</CardDescription>
                 </div>
                 {canModify && (
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" className="text-blue-600 hover:bg-blue-50 border-blue-300">
                       <Edit className="h-4 w-4 mr-2" />
                       Modifier
                     </Button>
-                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-red-600 hover:bg-red-50 border-red-300"
+                      onClick={() => handleDeleteEmployee(employee.id)}
+                    >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Supprimer
                     </Button>
@@ -190,25 +284,31 @@ const Employees = () => {
                 )}
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               <div>
-                <h4 className="font-medium mb-2">Équipements attribués:</h4>
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  Équipements attribués:
+                </h4>
                 {employee.assignedItems.length > 0 ? (
                   <div className="space-y-2">
                     {employee.assignedItems.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
                         <div>
-                          <p className="font-medium">{item.model}</p>
-                          <p className="text-sm text-muted-foreground">N° Parc: {item.parkNumber}</p>
+                          <p className="font-medium text-gray-800">{item.model}</p>
+                          <p className="text-sm text-gray-600">N° Parc: {item.parkNumber}</p>
                         </div>
-                        <Badge variant="outline">
+                        <Badge variant="outline" className="border-blue-300 text-blue-700">
                           Attribué le {new Date(item.assignDate).toLocaleDateString('fr-FR')}
                         </Badge>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">Aucun équipement attribué</p>
+                  <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                    <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                    <p>Aucun équipement attribué</p>
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -217,7 +317,7 @@ const Employees = () => {
       </div>
 
       {filteredEmployees.length === 0 && (
-        <Card>
+        <Card className="shadow-lg">
           <CardContent className="text-center py-8">
             <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-lg font-medium">Aucun employé trouvé</p>

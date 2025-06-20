@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { Search, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 // Données de démonstration
 const initialCategories = [
@@ -38,7 +39,16 @@ const Stock = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [isAddArticleOpen, setIsAddArticleOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState({ name: '', threshold: '' });
+  const [newArticle, setNewArticle] = useState({
+    model: '',
+    parkNumber: '',
+    serialNumber: '',
+    categoryId: '',
+    status: 'disponible'
+  });
   const { hasPermission } = useAuth();
+  const { toast } = useToast();
 
   const canModify = hasPermission('admin');
 
@@ -52,11 +62,87 @@ const Stock = () => {
     )
   })).filter(category => category.articles.length > 0 || searchTerm === '');
 
+  const handleCreateCategory = () => {
+    if (!newCategory.name || !newCategory.threshold) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const category = {
+      id: Date.now().toString(),
+      name: newCategory.name,
+      criticalThreshold: parseInt(newCategory.threshold),
+      articles: []
+    };
+
+    setCategories([...categories, category]);
+    setNewCategory({ name: '', threshold: '' });
+    setIsAddCategoryOpen(false);
+    toast({
+      title: "Succès",
+      description: "Catégorie créée avec succès"
+    });
+  };
+
+  const handleAddArticle = () => {
+    if (!newArticle.model || !newArticle.parkNumber || !newArticle.serialNumber || !newArticle.categoryId) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const article = {
+      id: Date.now().toString(),
+      model: newArticle.model,
+      parkNumber: newArticle.parkNumber,
+      serialNumber: newArticle.serialNumber,
+      status: newArticle.status
+    };
+
+    setCategories(categories.map(cat => 
+      cat.id === newArticle.categoryId 
+        ? { ...cat, articles: [...cat.articles, article] }
+        : cat
+    ));
+
+    setNewArticle({
+      model: '',
+      parkNumber: '',
+      serialNumber: '',
+      categoryId: '',
+      status: 'disponible'
+    });
+    setIsAddArticleOpen(false);
+    toast({
+      title: "Succès",
+      description: "Article ajouté avec succès"
+    });
+  };
+
+  const handleDeleteArticle = (categoryId: string, articleId: string) => {
+    setCategories(categories.map(cat => 
+      cat.id === categoryId 
+        ? { ...cat, articles: cat.articles.filter(article => article.id !== articleId) }
+        : cat
+    ));
+    toast({
+      title: "Succès",
+      description: "Article supprimé avec succès"
+    });
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      disponible: { variant: 'default', label: 'Disponible', className: 'bg-green-100 text-green-800' },
-      alloué: { variant: 'secondary', label: 'Alloué', className: 'bg-blue-100 text-blue-800' },
-      maintenance: { variant: 'destructive', label: 'Maintenance', className: 'bg-red-100 text-red-800' }
+      disponible: { label: 'Disponible', className: 'bg-green-100 text-green-800 border-green-200' },
+      alloué: { label: 'Alloué', className: 'bg-blue-100 text-blue-800 border-blue-200' },
+      maintenance: { label: 'Maintenance', className: 'bg-red-100 text-red-800 border-red-200' }
     };
     
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.disponible;
@@ -74,9 +160,14 @@ const Stock = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Gestion du Stock</h1>
-        <p className="text-gray-600 mt-2">Gérez vos articles et catégories</p>
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-xl shadow-lg">
+        <div className="flex items-center space-x-3">
+          <Package className="h-8 w-8" />
+          <div>
+            <h1 className="text-3xl font-bold">Gestion du Stock</h1>
+            <p className="text-blue-100 mt-2">Gérez vos articles et catégories avec efficacité</p>
+          </div>
+        </div>
       </div>
 
       {/* Barre de recherche et actions */}
@@ -87,7 +178,7 @@ const Stock = () => {
             placeholder="Rechercher un article..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
           />
         </div>
         
@@ -95,12 +186,12 @@ const Stock = () => {
           <div className="flex gap-2">
             <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" className="border-2 border-gray-300 hover:border-blue-500">
                   <Plus className="h-4 w-4 mr-2" />
                   Nouvelle catégorie
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Ajouter une catégorie</DialogTitle>
                   <DialogDescription>Créez une nouvelle catégorie d'articles</DialogDescription>
@@ -108,25 +199,38 @@ const Stock = () => {
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="categoryName">Nom de la catégorie</Label>
-                    <Input id="categoryName" placeholder="Ex: Ordinateurs portables" />
+                    <Input 
+                      id="categoryName" 
+                      placeholder="Ex: Ordinateurs portables"
+                      value={newCategory.name}
+                      onChange={(e) => setNewCategory({...newCategory, name: e.target.value})}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="threshold">Seuil critique</Label>
-                    <Input id="threshold" type="number" placeholder="10" />
+                    <Input 
+                      id="threshold" 
+                      type="number" 
+                      placeholder="10"
+                      value={newCategory.threshold}
+                      onChange={(e) => setNewCategory({...newCategory, threshold: e.target.value})}
+                    />
                   </div>
-                  <Button className="w-full">Créer la catégorie</Button>
+                  <Button onClick={handleCreateCategory} className="w-full">
+                    Créer la catégorie
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
 
             <Dialog open={isAddArticleOpen} onOpenChange={setIsAddArticleOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                   <Plus className="h-4 w-4 mr-2" />
                   Nouvel article
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Ajouter un article</DialogTitle>
                   <DialogDescription>Ajoutez un nouvel article au stock</DialogDescription>
@@ -134,19 +238,34 @@ const Stock = () => {
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="model">Modèle</Label>
-                    <Input id="model" placeholder="Ex: Dell Latitude 5520" />
+                    <Input 
+                      id="model" 
+                      placeholder="Ex: Dell Latitude 5520"
+                      value={newArticle.model}
+                      onChange={(e) => setNewArticle({...newArticle, model: e.target.value})}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="parkNumber">Numéro de parc</Label>
-                    <Input id="parkNumber" placeholder="Ex: PC001" />
+                    <Input 
+                      id="parkNumber" 
+                      placeholder="Ex: PC001"
+                      value={newArticle.parkNumber}
+                      onChange={(e) => setNewArticle({...newArticle, parkNumber: e.target.value})}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="serialNumber">Numéro de série</Label>
-                    <Input id="serialNumber" placeholder="Ex: DL5520001" />
+                    <Input 
+                      id="serialNumber" 
+                      placeholder="Ex: DL5520001"
+                      value={newArticle.serialNumber}
+                      onChange={(e) => setNewArticle({...newArticle, serialNumber: e.target.value})}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="category">Catégorie</Label>
-                    <Select>
+                    <Select onValueChange={(value) => setNewArticle({...newArticle, categoryId: value})}>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner une catégorie" />
                       </SelectTrigger>
@@ -161,7 +280,7 @@ const Stock = () => {
                   </div>
                   <div>
                     <Label htmlFor="status">Statut</Label>
-                    <Select>
+                    <Select onValueChange={(value) => setNewArticle({...newArticle, status: value})}>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner un statut" />
                       </SelectTrigger>
@@ -172,7 +291,9 @@ const Stock = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button className="w-full">Ajouter l'article</Button>
+                  <Button onClick={handleAddArticle} className="w-full">
+                    Ajouter l'article
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -187,11 +308,12 @@ const Stock = () => {
           const availableCount = category.articles.filter(a => a.status === 'disponible').length;
           
           return (
-            <Card key={category.id} className={isCritical ? 'border-red-200 bg-red-50' : ''}>
-              <CardHeader>
+            <Card key={category.id} className={`shadow-lg ${isCritical ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+              <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5 text-blue-600" />
                       {category.name}
                       {isCritical && <Badge variant="destructive">Critique</Badge>}
                     </CardTitle>
@@ -201,39 +323,44 @@ const Stock = () => {
                     </CardDescription>
                   </div>
                   {canModify && (
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" className="border-blue-300 text-blue-600 hover:bg-blue-50">
                       <Edit className="h-4 w-4 mr-2" />
                       Modifier seuil
                     </Button>
                   )}
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-2">Modèle</th>
-                        <th className="text-left p-2">N° Parc</th>
-                        <th className="text-left p-2">N° Série</th>
-                        <th className="text-left p-2">Statut</th>
-                        {canModify && <th className="text-left p-2">Actions</th>}
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left p-4 font-semibold text-gray-700">Modèle</th>
+                        <th className="text-left p-4 font-semibold text-gray-700">N° Parc</th>
+                        <th className="text-left p-4 font-semibold text-gray-700">N° Série</th>
+                        <th className="text-left p-4 font-semibold text-gray-700">Statut</th>
+                        {canModify && <th className="text-left p-4 font-semibold text-gray-700">Actions</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {category.articles.map(article => (
-                        <tr key={article.id} className="border-b hover:bg-gray-50">
-                          <td className="p-2 font-medium">{article.model}</td>
-                          <td className="p-2">{article.parkNumber}</td>
-                          <td className="p-2">{article.serialNumber}</td>
-                          <td className="p-2">{getStatusBadge(article.status)}</td>
+                        <tr key={article.id} className="border-b hover:bg-gray-50 transition-colors">
+                          <td className="p-4 font-medium">{article.model}</td>
+                          <td className="p-4 text-gray-600">{article.parkNumber}</td>
+                          <td className="p-4 text-gray-600">{article.serialNumber}</td>
+                          <td className="p-4">{getStatusBadge(article.status)}</td>
                           {canModify && (
-                            <td className="p-2">
+                            <td className="p-4">
                               <div className="flex gap-2">
-                                <Button variant="outline" size="sm">
+                                <Button variant="outline" size="sm" className="text-blue-600 hover:bg-blue-50">
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-red-600 hover:bg-red-50"
+                                  onClick={() => handleDeleteArticle(category.id, article.id)}
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
