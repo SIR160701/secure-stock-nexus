@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,7 +42,15 @@ const Employees = () => {
   const [employees, setEmployees] = useState(initialEmployees);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
+  const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
   const [newEmployee, setNewEmployee] = useState({
+    name: '',
+    department: '',
+    equipment: '',
+    assignDate: ''
+  });
+  const [editingEmployee, setEditingEmployee] = useState({
+    id: '',
     name: '',
     department: '',
     equipment: '',
@@ -86,6 +93,49 @@ const Employees = () => {
     toast({
       title: "Succès",
       description: "Employé ajouté avec succès"
+    });
+  };
+
+  const handleEditEmployee = (employee: any) => {
+    setEditingEmployee({
+      id: employee.id,
+      name: employee.name,
+      department: employee.department,
+      equipment: employee.assignedItems.length > 0 ? employee.assignedItems[0].parkNumber : '',
+      assignDate: employee.assignedItems.length > 0 ? employee.assignedItems[0].assignDate : ''
+    });
+    setIsEditEmployeeOpen(true);
+  };
+
+  const handleUpdateEmployee = () => {
+    if (!editingEmployee.name || !editingEmployee.department) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir au moins le nom et le département",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setEmployees(employees.map(emp => 
+      emp.id === editingEmployee.id 
+        ? {
+            ...emp,
+            name: editingEmployee.name,
+            department: editingEmployee.department,
+            assignedItems: editingEmployee.equipment ? [{
+              parkNumber: editingEmployee.equipment,
+              model: 'Équipement assigné',
+              assignDate: editingEmployee.assignDate || new Date().toISOString().split('T')[0]
+            }] : []
+          }
+        : emp
+    ));
+
+    setIsEditEmployeeOpen(false);
+    toast({
+      title: "Succès",
+      description: "Employé modifié avec succès"
     });
   };
 
@@ -231,6 +281,58 @@ const Employees = () => {
         )}
       </div>
 
+      {/* Edit Employee Dialog */}
+      <Dialog open={isEditEmployeeOpen} onOpenChange={setIsEditEmployeeOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifier l'employé</DialogTitle>
+            <DialogDescription>Modifiez les informations de l'employé</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="editEmployeeName">Nom de l'employé</Label>
+              <Input 
+                id="editEmployeeName" 
+                value={editingEmployee.name}
+                onChange={(e) => setEditingEmployee({...editingEmployee, name: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label htmlFor="editDepartment">Département</Label>
+              <Input 
+                id="editDepartment" 
+                value={editingEmployee.department}
+                onChange={(e) => setEditingEmployee({...editingEmployee, department: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label htmlFor="editEquipment">Équipement attribué</Label>
+              <Input 
+                id="editEquipment" 
+                value={editingEmployee.equipment}
+                onChange={(e) => setEditingEmployee({...editingEmployee, equipment: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label htmlFor="editAssignDate">Date d'attribution</Label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input 
+                  id="editAssignDate" 
+                  type="date" 
+                  className="pl-10"
+                  value={editingEmployee.assignDate}
+                  onChange={(e) => setEditingEmployee({...editingEmployee, assignDate: e.target.value})}
+                />
+              </div>
+            </div>
+            <Button onClick={handleUpdateEmployee} className="w-full">
+              Modifier l'employé
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Répartition par département */}
       <Card className="shadow-lg border-2 border-gray-200">
         <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
@@ -267,7 +369,12 @@ const Employees = () => {
                 </div>
                 {canModify && (
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="text-blue-600 hover:bg-blue-50 border-blue-300">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-blue-600 hover:bg-blue-50 border-blue-300"
+                      onClick={() => handleEditEmployee(employee)}
+                    >
                       <Edit className="h-4 w-4 mr-2" />
                       Modifier
                     </Button>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +38,8 @@ const Stock = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [isAddArticleOpen, setIsAddArticleOpen] = useState(false);
+  const [isEditArticleOpen, setIsEditArticleOpen] = useState(false);
+  const [isEditThresholdOpen, setIsEditThresholdOpen] = useState(false);
   const [newCategory, setNewCategory] = useState({ name: '', threshold: '' });
   const [newArticle, setNewArticle] = useState({
     model: '',
@@ -46,6 +47,19 @@ const Stock = () => {
     serialNumber: '',
     categoryId: '',
     status: 'disponible'
+  });
+  const [editingArticle, setEditingArticle] = useState({
+    id: '',
+    model: '',
+    parkNumber: '',
+    serialNumber: '',
+    status: 'disponible',
+    categoryId: ''
+  });
+  const [editingCategory, setEditingCategory] = useState({
+    id: '',
+    name: '',
+    criticalThreshold: 0
   });
   const { hasPermission } = useAuth();
   const { toast } = useToast();
@@ -123,6 +137,86 @@ const Stock = () => {
     toast({
       title: "Succès",
       description: "Article ajouté avec succès"
+    });
+  };
+
+  const handleEditArticle = (categoryId: string, article: any) => {
+    setEditingArticle({
+      id: article.id,
+      model: article.model,
+      parkNumber: article.parkNumber,
+      serialNumber: article.serialNumber,
+      status: article.status,
+      categoryId: categoryId
+    });
+    setIsEditArticleOpen(true);
+  };
+
+  const handleUpdateArticle = () => {
+    if (!editingArticle.model || !editingArticle.parkNumber || !editingArticle.serialNumber) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCategories(categories.map(cat => 
+      cat.id === editingArticle.categoryId 
+        ? { 
+            ...cat, 
+            articles: cat.articles.map(article =>
+              article.id === editingArticle.id
+                ? {
+                    ...article,
+                    model: editingArticle.model,
+                    parkNumber: editingArticle.parkNumber,
+                    serialNumber: editingArticle.serialNumber,
+                    status: editingArticle.status
+                  }
+                : article
+            )
+          }
+        : cat
+    ));
+
+    setIsEditArticleOpen(false);
+    toast({
+      title: "Succès",
+      description: "Article modifié avec succès"
+    });
+  };
+
+  const handleEditThreshold = (category: any) => {
+    setEditingCategory({
+      id: category.id,
+      name: category.name,
+      criticalThreshold: category.criticalThreshold
+    });
+    setIsEditThresholdOpen(true);
+  };
+
+  const handleUpdateThreshold = () => {
+    if (!editingCategory.criticalThreshold || editingCategory.criticalThreshold < 0) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez entrer un seuil valide",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCategories(categories.map(cat => 
+      cat.id === editingCategory.id 
+        ? { ...cat, criticalThreshold: editingCategory.criticalThreshold }
+        : cat
+    ));
+
+    setIsEditThresholdOpen(false);
+    toast({
+      title: "Succès",
+      description: "Seuil critique modifié avec succès"
     });
   };
 
@@ -301,6 +395,82 @@ const Stock = () => {
         )}
       </div>
 
+      {/* Edit Article Dialog */}
+      <Dialog open={isEditArticleOpen} onOpenChange={setIsEditArticleOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifier l'article</DialogTitle>
+            <DialogDescription>Modifiez les informations de l'article</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="editModel">Modèle</Label>
+              <Input 
+                id="editModel" 
+                value={editingArticle.model}
+                onChange={(e) => setEditingArticle({...editingArticle, model: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label htmlFor="editParkNumber">Numéro de parc</Label>
+              <Input 
+                id="editParkNumber" 
+                value={editingArticle.parkNumber}
+                onChange={(e) => setEditingArticle({...editingArticle, parkNumber: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label htmlFor="editSerialNumber">Numéro de série</Label>
+              <Input 
+                id="editSerialNumber" 
+                value={editingArticle.serialNumber}
+                onChange={(e) => setEditingArticle({...editingArticle, serialNumber: e.target.value})}
+              />
+            </div>
+            <div>
+              <Label htmlFor="editStatus">Statut</Label>
+              <Select value={editingArticle.status} onValueChange={(value) => setEditingArticle({...editingArticle, status: value})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="disponible">Disponible</SelectItem>
+                  <SelectItem value="alloué">Alloué</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleUpdateArticle} className="w-full">
+              Modifier l'article
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Threshold Dialog */}
+      <Dialog open={isEditThresholdOpen} onOpenChange={setIsEditThresholdOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifier le seuil critique</DialogTitle>
+            <DialogDescription>Modifiez le seuil critique pour {editingCategory.name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="editThreshold">Seuil critique</Label>
+              <Input 
+                id="editThreshold" 
+                type="number"
+                value={editingCategory.criticalThreshold}
+                onChange={(e) => setEditingCategory({...editingCategory, criticalThreshold: parseInt(e.target.value) || 0})}
+              />
+            </div>
+            <Button onClick={handleUpdateThreshold} className="w-full">
+              Modifier le seuil
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Liste des catégories */}
       <div className="space-y-6">
         {filteredCategories.map(category => {
@@ -323,7 +493,12 @@ const Stock = () => {
                     </CardDescription>
                   </div>
                   {canModify && (
-                    <Button variant="outline" size="sm" className="border-blue-300 text-blue-600 hover:bg-blue-50">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                      onClick={() => handleEditThreshold(category)}
+                    >
                       <Edit className="h-4 w-4 mr-2" />
                       Modifier seuil
                     </Button>
@@ -352,7 +527,12 @@ const Stock = () => {
                           {canModify && (
                             <td className="p-4">
                               <div className="flex gap-2">
-                                <Button variant="outline" size="sm" className="text-blue-600 hover:bg-blue-50">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="text-blue-600 hover:bg-blue-50"
+                                  onClick={() => handleEditArticle(category.id, article)}
+                                >
                                   <Edit className="h-4 w-4" />
                                 </Button>
                                 <Button 
