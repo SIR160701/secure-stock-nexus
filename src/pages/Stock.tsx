@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { Search, Plus, Edit, Trash2, Package } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, AlertTriangle, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Données de démonstration
@@ -252,6 +252,34 @@ const Stock = () => {
     return availableCount <= category.criticalThreshold;
   };
 
+  const getCriticalIcon = (category: any) => {
+    const availableCount = category.articles.filter((a: any) => a.status === 'disponible').length;
+    const isCritical = availableCount <= category.criticalThreshold;
+    
+    if (!isCritical) return null;
+    
+    // Différentes icônes selon le niveau de criticité
+    if (availableCount === 0) {
+      return <ShieldAlert className="h-4 w-4 text-red-600" />;
+    } else if (availableCount <= Math.ceil(category.criticalThreshold * 0.5)) {
+      return <AlertCircle className="h-4 w-4 text-red-500" />;
+    } else {
+      return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+    }
+  };
+
+  const getCriticalBadgeVariant = (category: any) => {
+    const availableCount = category.articles.filter((a: any) => a.status === 'disponible').length;
+    
+    if (availableCount === 0) {
+      return "destructive"; // Rouge foncé
+    } else if (availableCount <= Math.ceil(category.criticalThreshold * 0.5)) {
+      return "destructive"; // Rouge
+    } else {
+      return "secondary"; // Orange/Jaune
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-xl shadow-lg">
@@ -476,6 +504,8 @@ const Stock = () => {
         {filteredCategories.map(category => {
           const isCritical = getCriticalStatus(category);
           const availableCount = category.articles.filter(a => a.status === 'disponible').length;
+          const criticalIcon = getCriticalIcon(category);
+          const badgeVariant = getCriticalBadgeVariant(category);
           
           return (
             <Card key={category.id} className={`shadow-lg ${isCritical ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
@@ -485,7 +515,12 @@ const Stock = () => {
                     <CardTitle className="flex items-center gap-2">
                       <Package className="h-5 w-5 text-blue-600" />
                       {category.name}
-                      {isCritical && <Badge variant="destructive">Critique</Badge>}
+                      {isCritical && (
+                        <Badge variant={badgeVariant} className="flex items-center gap-1">
+                          {criticalIcon}
+                          Critique
+                        </Badge>
+                      )}
                     </CardTitle>
                     <CardDescription>
                       {category.articles.length} articles au total - {availableCount} disponibles
