@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { Search, Plus, Edit, Trash2, Package, AlertTriangle, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
+import { MaintenanceForm, MaintenanceData } from '@/components/MaintenanceForm';
 
 // Données de démonstration
 const initialCategories = [
@@ -40,6 +42,7 @@ const Stock = () => {
   const [isAddArticleOpen, setIsAddArticleOpen] = useState(false);
   const [isEditArticleOpen, setIsEditArticleOpen] = useState(false);
   const [isEditThresholdOpen, setIsEditThresholdOpen] = useState(false);
+  const [isMaintenanceFormOpen, setIsMaintenanceFormOpen] = useState(false);
   const [newCategory, setNewCategory] = useState({ name: '', threshold: '' });
   const [newArticle, setNewArticle] = useState({
     model: '',
@@ -61,8 +64,10 @@ const Stock = () => {
     name: '',
     criticalThreshold: 0
   });
+  const [pendingMaintenanceArticle, setPendingMaintenanceArticle] = useState<any>(null);
   const { hasPermission } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const canModify = hasPermission('admin');
 
@@ -162,6 +167,19 @@ const Stock = () => {
       return;
     }
 
+    // Check if status is changing to maintenance
+    const originalArticle = categories
+      .find(cat => cat.id === editingArticle.categoryId)
+      ?.articles.find(art => art.id === editingArticle.id);
+
+    if (editingArticle.status === 'maintenance' && originalArticle?.status !== 'maintenance') {
+      // Open maintenance form instead of updating directly
+      setPendingMaintenanceArticle(editingArticle);
+      setIsMaintenanceFormOpen(true);
+      return;
+    }
+
+    // Normal update for other status changes
     setCategories(categories.map(cat => 
       cat.id === editingArticle.categoryId 
         ? { 
@@ -186,6 +204,59 @@ const Stock = () => {
       title: "Succès",
       description: "Article modifié avec succès"
     });
+  };
+
+  const handleMaintenanceSubmit = (maintenanceData: MaintenanceData) => {
+    if (!pendingMaintenanceArticle) return;
+
+    // Update article status to maintenance
+    setCategories(categories.map(cat => 
+      cat.id === pendingMaintenanceArticle.categoryId 
+        ? { 
+            ...cat, 
+            articles: cat.articles.map(article =>
+              article.id === pendingMaintenanceArticle.id
+                ? {
+                    ...article,
+                    model: pendingMaintenanceArticle.model,
+                    parkNumber: pendingMaintenanceArticle.parkNumber,
+                    serialNumber: pendingMaintenanceArticle.serialNumber,
+                    status: 'maintenance'
+                  }
+                : article
+            )
+          }
+        : cat
+    ));
+
+    // Store maintenance data in localStorage
+    const maintenanceItem = {
+      id: Date.now().toString(),
+      item: pendingMaintenanceArticle.model,
+      category: categories.find(cat => cat.id === pendingMaintenanceArticle.categoryId)?.name || '',
+      problem: maintenanceData.problem,
+      technician: maintenanceData.technician,
+      startDate: maintenanceData.startDate.toISOString().split('T')[0],
+      endDate: maintenanceData.endDate?.toISOString().split('T')[0] || '',
+      status: 'en_cours',
+      parkNumber: pendingMaintenanceArticle.parkNumber,
+      serialNumber: pendingMaintenanceArticle.serialNumber
+    };
+
+    const existingMaintenance = JSON.parse(localStorage.getItem('maintenanceItems') || '[]');
+    localStorage.setItem('maintenanceItems', JSON.stringify([...existingMaintenance, maintenanceItem]));
+
+    setIsMaintenanceFormOpen(false);
+    setIsEditArticleOpen(false);
+    setPendingMaintenanceArticle(null);
+
+    toast({
+      title: "Succès",
+      description: "Article envoyé en maintenance avec succès"
+    });
+
+    // Navigate to maintenance page
+    navigate('/maintenance');
   };
 
   const handleEditThreshold = (category: any) => {
@@ -474,6 +545,17 @@ const Stock = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Maintenance Form Dialog */}
+      <MaintenanceForm
+        isOpen={isMaintenanceFormOpen}
+        onClose={() => {
+          setIsMaintenanceFormOpen(false);
+          setPendingMaintenanceArticle(null);
+        }}
+        onSubmit={handleMaintenanceSubmit}
+        article={pendingMaintenanceArticle || { model: '', parkNumber: '', serialNumber: '' }}
+      />
 
       {/* Edit Threshold Dialog */}
       <Dialog open={isEditThresholdOpen} onOpenChange={setIsEditThresholdOpen}>
