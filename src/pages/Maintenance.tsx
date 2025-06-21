@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +19,19 @@ interface MaintenanceItem {
 
 const Maintenance = () => {
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState<Partial<MaintenanceItem>>({
+    item: '',
+    category: '',
+    problem: '',
+    technician: '',
+    startDate: '',
+    endDate: '',
+    status: 'en_cours',
+    parkNumber: '',
+    serialNumber: ''
+  });
+  const [editIndex, setEditIndex] = useState<number | null>(null);
 
   useEffect(() => {
     // Load maintenance items from localStorage
@@ -73,14 +85,14 @@ const Maintenance = () => {
           <h1 className="text-3xl font-bold text-gray-900">Maintenance</h1>
           <p className="text-gray-600 mt-2">Suivi des équipements en maintenance</p>
         </div>
-        <Button>
+        <Button onClick={() => setShowForm(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvelle maintenance
         </Button>
       </div>
 
       <div className="grid gap-4">
-        {maintenanceItems.map(item => (
+        {maintenanceItems.map((item, index) => (
           <Card key={item.id} className="shadow-lg">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -129,13 +141,81 @@ const Maintenance = () => {
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
-                <Button variant="outline" size="sm">Modifier</Button>
-                <Button variant="outline" size="sm">Clôturer</Button>
+                <Button variant="outline" size="sm" onClick={() => {
+                  setEditIndex(index);
+                  setFormData(item);
+                  setShowForm(true);
+                }}>Modifier</Button>
+                <Button variant="outline" size="sm" onClick={() => {
+                  const updatedItems = maintenanceItems.map((itm, idx) =>
+                    idx === index ? { ...itm, status: 'terminee' } : itm
+                  );
+                  setMaintenanceItems(updatedItems);
+                  localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems));
+                }}>Clôturer</Button>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {showForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Nouvelle maintenance</h2>
+            <form onSubmit={e => {
+              e.preventDefault();
+              if (editIndex !== null) {
+                // Edition
+                const updatedItems = maintenanceItems.map((itm, idx) =>
+                  idx === editIndex ? { ...itm, ...formData } as MaintenanceItem : itm
+                );
+                setMaintenanceItems(updatedItems);
+                localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems));
+              } else {
+                // Ajout
+                const newItem = {
+                  ...formData,
+                  id: Date.now().toString(),
+                  status: formData.status || 'en_cours',
+                } as MaintenanceItem;
+                const updatedItems = [newItem, ...maintenanceItems];
+                setMaintenanceItems(updatedItems);
+                localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems));
+              }
+              setShowForm(false);
+              setFormData({
+                item: '',
+                category: '',
+                problem: '',
+                technician: '',
+                startDate: '',
+                endDate: '',
+                status: 'en_cours',
+                parkNumber: '',
+                serialNumber: ''
+              });
+              setEditIndex(null);
+            }} className="space-y-3">
+              <input required className="w-full border rounded p-2" placeholder="Équipement" value={formData.item} onChange={e => setFormData(f => ({ ...f, item: e.target.value }))} />
+              <input required className="w-full border rounded p-2" placeholder="Catégorie" value={formData.category} onChange={e => setFormData(f => ({ ...f, category: e.target.value }))} />
+              <input required className="w-full border rounded p-2" placeholder="Problème" value={formData.problem} onChange={e => setFormData(f => ({ ...f, problem: e.target.value }))} />
+              <input required className="w-full border rounded p-2" placeholder="Technicien" value={formData.technician} onChange={e => setFormData(f => ({ ...f, technician: e.target.value }))} />
+              <input required type="date" className="w-full border rounded p-2" placeholder="Date de début" value={formData.startDate} onChange={e => setFormData(f => ({ ...f, startDate: e.target.value }))} />
+              <input type="date" className="w-full border rounded p-2" placeholder="Date de fin" value={formData.endDate} onChange={e => setFormData(f => ({ ...f, endDate: e.target.value }))} />
+              <input className="w-full border rounded p-2" placeholder="N° de parc (optionnel)" value={formData.parkNumber} onChange={e => setFormData(f => ({ ...f, parkNumber: e.target.value }))} />
+              <input className="w-full border rounded p-2" placeholder="N° de série (optionnel)" value={formData.serialNumber} onChange={e => setFormData(f => ({ ...f, serialNumber: e.target.value }))} />
+              <div className="flex gap-2 justify-end">
+                <Button type="button" variant="outline" onClick={() => {
+                  setShowForm(false);
+                  setEditIndex(null);
+                }}>Annuler</Button>
+                <Button type="submit">Ajouter</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
