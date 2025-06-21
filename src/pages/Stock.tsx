@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { Search, Plus, Edit, Trash2, Package, AlertTriangle, AlertCircle, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
 
 // Données de démonstration
 const initialCategories = [
@@ -64,7 +63,6 @@ const Stock = () => {
   });
   const { hasPermission } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   const canModify = hasPermission('admin');
 
@@ -234,37 +232,16 @@ const Stock = () => {
     });
   };
 
-  const getStatusBadge = (status: string, article?: any, categoryName?: string) => {
+  const getStatusBadge = (status: string) => {
     const statusConfig = {
       disponible: { label: 'Disponible', className: 'bg-green-100 text-green-800 border-green-200' },
       alloué: { label: 'Alloué', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-      maintenance: { label: 'Maintenance', className: 'bg-red-100 text-red-800 border-red-200 cursor-pointer hover:bg-red-200' }
+      maintenance: { label: 'Maintenance', className: 'bg-red-100 text-red-800 border-red-200' }
     };
     
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.disponible;
-    
-    const handleMaintenanceClick = () => {
-      if (status === 'maintenance' && article && categoryName) {
-        // Rediriger vers la page maintenance avec les informations de l'article
-        navigate('/maintenance', { 
-          state: { 
-            fromStock: true,
-            articleInfo: {
-              item: article.model,
-              category: categoryName,
-              parkNumber: article.parkNumber,
-              serialNumber: article.serialNumber
-            }
-          }
-        });
-      }
-    };
-    
     return (
-      <Badge 
-        className={config.className}
-        onClick={status === 'maintenance' ? handleMaintenanceClick : undefined}
-      >
+      <Badge className={config.className}>
         {config.label}
       </Badge>
     );
@@ -581,7 +558,7 @@ const Stock = () => {
                           <td className="p-4 font-medium">{article.model}</td>
                           <td className="p-4 text-gray-600">{article.parkNumber}</td>
                           <td className="p-4 text-gray-600">{article.serialNumber}</td>
-                          <td className="p-4">{getStatusBadge(article.status, article, category.name)}</td>
+                          <td className="p-4">{getStatusBadge(article.status)}</td>
                           {canModify && (
                             <td className="p-4">
                               <div className="flex gap-2">
