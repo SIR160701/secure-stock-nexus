@@ -1,8 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Settings, Plus, Calendar, User } from 'lucide-react';
+import { Settings, Plus, Calendar, User, Trash2 } from 'lucide-react';
+import { MaintenanceDialog } from '@/components/MaintenanceDialog';
+import { MaintenanceDeleteDialog } from '@/components/MaintenanceDeleteDialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface MaintenanceItem {
   id: string;
@@ -19,19 +23,11 @@ interface MaintenanceItem {
 
 const Maintenance = () => {
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState<Partial<MaintenanceItem>>({
-    item: '',
-    category: '',
-    problem: '',
-    technician: '',
-    startDate: '',
-    endDate: '',
-    status: 'en_cours',
-    parkNumber: '',
-    serialNumber: ''
-  });
-  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [showDialog, setShowDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [editingItem, setEditingItem] = useState<MaintenanceItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<MaintenanceItem | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Load maintenance items from localStorage
@@ -78,6 +74,76 @@ const Maintenance = () => {
     );
   };
 
+  const handleCreateMaintenance = (data: any) => {
+    const newItem: MaintenanceItem = {
+      ...data,
+      id: Date.now().toString(),
+      startDate: data.startDate.toISOString().split('T')[0],
+      endDate: data.endDate ? data.endDate.toISOString().split('T')[0] : '',
+    };
+    const updatedItems = [newItem, ...maintenanceItems];
+    setMaintenanceItems(updatedItems);
+    localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems.slice(2))); // Exclude default items
+  };
+
+  const handleEditMaintenance = (data: any) => {
+    const updatedItems = maintenanceItems.map(item =>
+      item.id === data.id ? {
+        ...data,
+        startDate: data.startDate.toISOString().split('T')[0],
+        endDate: data.endDate ? data.endDate.toISOString().split('T')[0] : '',
+      } : item
+    );
+    setMaintenanceItems(updatedItems);
+    localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems.slice(2))); // Exclude default items
+    setEditingItem(null);
+  };
+
+  const handleCloseItem = (id: string) => {
+    const updatedItems = maintenanceItems.map(item =>
+      item.id === id ? { ...item, status: 'terminee' } : item
+    );
+    setMaintenanceItems(updatedItems);
+    localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems.slice(2))); // Exclude default items
+    
+    const item = maintenanceItems.find(i => i.id === id);
+    toast({
+      title: 'Maintenance clôturée',
+      description: `La maintenance pour ${item?.item} a été marquée comme terminée.`,
+    });
+  };
+
+  const handleDeleteItem = (item: MaintenanceItem) => {
+    setDeletingItem(item);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = () => {
+    if (deletingItem) {
+      const updatedItems = maintenanceItems.filter(item => item.id !== deletingItem.id);
+      setMaintenanceItems(updatedItems);
+      localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems.slice(2))); // Exclude default items
+      
+      toast({
+        title: 'Maintenance supprimée',
+        description: `La maintenance pour ${deletingItem.item} a été supprimée.`,
+      });
+      
+      setDeletingItem(null);
+      setShowDeleteDialog(false);
+    }
+  };
+
+  const openEditDialog = (item: MaintenanceItem) => {
+    setEditingItem(item);
+    setShowDialog(true);
+  };
+
+  const closeDialog = () => {
+    setShowDialog(false);
+    setEditingItem(null);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -85,14 +151,14 @@ const Maintenance = () => {
           <h1 className="text-3xl font-bold text-gray-900">Maintenance</h1>
           <p className="text-gray-600 mt-2">Suivi des équipements en maintenance</p>
         </div>
-        <Button onClick={() => setShowForm(true)}>
+        <Button onClick={() => setShowDialog(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvelle maintenance
         </Button>
       </div>
 
       <div className="grid gap-4">
-        {maintenanceItems.map((item, index) => (
+        {maintenanceItems.map((item) => (
           <Card key={item.id} className="shadow-lg">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -141,81 +207,45 @@ const Maintenance = () => {
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
-                <Button variant="outline" size="sm" onClick={() => {
-                  setEditIndex(index);
-                  setFormData(item);
-                  setShowForm(true);
-                }}>Modifier</Button>
-                <Button variant="outline" size="sm" onClick={() => {
-                  const updatedItems = maintenanceItems.map((itm, idx) =>
-                    idx === index ? { ...itm, status: 'terminee' } : itm
-                  );
-                  setMaintenanceItems(updatedItems);
-                  localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems));
-                }}>Clôturer</Button>
+                <Button variant="outline" size="sm" onClick={() => openEditDialog(item)}>
+                  Modifier
+                </Button>
+                {item.status !== 'terminee' && (
+                  <Button variant="outline" size="sm" onClick={() => handleCloseItem(item.id)}>
+                    Clôturer
+                  </Button>
+                )}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleDeleteItem(item)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Nouvelle maintenance</h2>
-            <form onSubmit={e => {
-              e.preventDefault();
-              if (editIndex !== null) {
-                // Edition
-                const updatedItems = maintenanceItems.map((itm, idx) =>
-                  idx === editIndex ? { ...itm, ...formData } as MaintenanceItem : itm
-                );
-                setMaintenanceItems(updatedItems);
-                localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems));
-              } else {
-                // Ajout
-                const newItem = {
-                  ...formData,
-                  id: Date.now().toString(),
-                  status: formData.status || 'en_cours',
-                } as MaintenanceItem;
-                const updatedItems = [newItem, ...maintenanceItems];
-                setMaintenanceItems(updatedItems);
-                localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems));
-              }
-              setShowForm(false);
-              setFormData({
-                item: '',
-                category: '',
-                problem: '',
-                technician: '',
-                startDate: '',
-                endDate: '',
-                status: 'en_cours',
-                parkNumber: '',
-                serialNumber: ''
-              });
-              setEditIndex(null);
-            }} className="space-y-3">
-              <input required className="w-full border rounded p-2" placeholder="Équipement" value={formData.item} onChange={e => setFormData(f => ({ ...f, item: e.target.value }))} />
-              <input required className="w-full border rounded p-2" placeholder="Catégorie" value={formData.category} onChange={e => setFormData(f => ({ ...f, category: e.target.value }))} />
-              <input required className="w-full border rounded p-2" placeholder="Problème" value={formData.problem} onChange={e => setFormData(f => ({ ...f, problem: e.target.value }))} />
-              <input required className="w-full border rounded p-2" placeholder="Technicien" value={formData.technician} onChange={e => setFormData(f => ({ ...f, technician: e.target.value }))} />
-              <input required type="date" className="w-full border rounded p-2" placeholder="Date de début" value={formData.startDate} onChange={e => setFormData(f => ({ ...f, startDate: e.target.value }))} />
-              <input type="date" className="w-full border rounded p-2" placeholder="Date de fin" value={formData.endDate} onChange={e => setFormData(f => ({ ...f, endDate: e.target.value }))} />
-              <input className="w-full border rounded p-2" placeholder="N° de parc (optionnel)" value={formData.parkNumber} onChange={e => setFormData(f => ({ ...f, parkNumber: e.target.value }))} />
-              <input className="w-full border rounded p-2" placeholder="N° de série (optionnel)" value={formData.serialNumber} onChange={e => setFormData(f => ({ ...f, serialNumber: e.target.value }))} />
-              <div className="flex gap-2 justify-end">
-                <Button type="button" variant="outline" onClick={() => {
-                  setShowForm(false);
-                  setEditIndex(null);
-                }}>Annuler</Button>
-                <Button type="submit">Ajouter</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <MaintenanceDialog
+        isOpen={showDialog}
+        onClose={closeDialog}
+        onSubmit={editingItem ? handleEditMaintenance : handleCreateMaintenance}
+        initialData={editingItem || undefined}
+        mode={editingItem ? 'edit' : 'create'}
+      />
+
+      <MaintenanceDeleteDialog
+        isOpen={showDeleteDialog}
+        onClose={() => {
+          setShowDeleteDialog(false);
+          setDeletingItem(null);
+        }}
+        onConfirm={confirmDelete}
+        itemName={deletingItem?.item || ''}
+      />
     </div>
   );
 };
