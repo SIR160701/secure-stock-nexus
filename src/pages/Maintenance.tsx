@@ -28,7 +28,7 @@ interface MaintenanceEditItem {
   technician: string;
   startDate: Date;
   endDate?: Date;
-  status: string;
+  status: 'en_cours' | 'terminee' | 'en_retard';
   parkNumber?: string;
   serialNumber?: string;
 }
