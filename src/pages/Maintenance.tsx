@@ -20,11 +20,24 @@ interface MaintenanceItem {
   serialNumber?: string;
 }
 
+interface MaintenanceEditItem {
+  id: string;
+  item: string;
+  category: string;
+  problem: string;
+  technician: string;
+  startDate: Date;
+  endDate?: Date;
+  status: string;
+  parkNumber?: string;
+  serialNumber?: string;
+}
+
 const Maintenance = () => {
   const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [editingItem, setEditingItem] = useState<MaintenanceItem | null>(null);
+  const [editingItem, setEditingItem] = useState<MaintenanceEditItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<MaintenanceItem | null>(null);
   const { toast } = useToast();
 
@@ -134,8 +147,8 @@ const Maintenance = () => {
   };
 
   const openEditDialog = (item: MaintenanceItem) => {
-    // Convert string dates to Date objects for the form
-    const editData = {
+    // Convert MaintenanceItem to MaintenanceEditItem with proper Date objects
+    const editData: MaintenanceEditItem = {
       ...item,
       startDate: new Date(item.startDate),
       endDate: item.endDate ? new Date(item.endDate) : undefined,
