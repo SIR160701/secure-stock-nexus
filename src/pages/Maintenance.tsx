@@ -147,11 +147,12 @@ const Maintenance = () => {
   };
 
   const openEditDialog = (item: MaintenanceItem) => {
-    // Convert MaintenanceItem to MaintenanceEditItem with proper Date objects
+    // Convert MaintenanceItem to MaintenanceEditItem with proper Date objects and type assertion for status
     const editData: MaintenanceEditItem = {
       ...item,
       startDate: new Date(item.startDate),
       endDate: item.endDate ? new Date(item.endDate) : undefined,
+      status: item.status as 'en_cours' | 'terminee' | 'en_retard',
     };
     setEditingItem(editData);
     setShowDialog(true);
