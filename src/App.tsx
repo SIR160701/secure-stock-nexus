@@ -1,20 +1,10 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import Index from "./pages/Index";
+import React from 'react';
 
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <Index />
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+// Ce fichier n'est plus utilisé comme point d'entrée principal
+// Tout a été déplacé vers main.tsx pour simplifier la structure
+const App = () => {
+  return <div>App component - not used</div>;
+};
 
 export default App;
