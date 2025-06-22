@@ -135,7 +135,13 @@ const Maintenance = () => {
   };
 
   const openEditDialog = (item: MaintenanceItem) => {
-    setEditingItem(item);
+    // Convert string dates to Date objects for the form
+    const editData = {
+      ...item,
+      startDate: new Date(item.startDate),
+      endDate: item.endDate ? new Date(item.endDate) : undefined,
+    };
+    setEditingItem(editData as any);
     setShowDialog(true);
   };
 

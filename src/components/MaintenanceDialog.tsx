@@ -10,7 +10,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarIcon, Settings } from 'lucide-react';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -193,7 +192,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, "dd/MM/yyyy", { locale: fr }) : "Sélectionner une date"}
+                    {startDate ? format(startDate, "dd/MM/yyyy") : "Sélectionner une date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -202,6 +201,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
                     selected={startDate}
                     onSelect={(date) => date && setValue('startDate', date)}
                     initialFocus
+                    className="p-3 pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
@@ -219,7 +219,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, "dd/MM/yyyy", { locale: fr }) : "Sélectionner une date"}
+                    {endDate ? format(endDate, "dd/MM/yyyy") : "Sélectionner une date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -229,6 +229,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
                     onSelect={(date) => setValue('endDate', date)}
                     initialFocus
                     disabled={(date) => startDate && date < startDate}
+                    className="p-3 pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
