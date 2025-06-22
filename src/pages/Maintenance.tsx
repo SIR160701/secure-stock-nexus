@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -141,7 +140,7 @@ const Maintenance = () => {
       startDate: new Date(item.startDate),
       endDate: item.endDate ? new Date(item.endDate) : undefined,
     };
-    setEditingItem(editData as any);
+    setEditingItem(editData);
     setShowDialog(true);
   };
 
