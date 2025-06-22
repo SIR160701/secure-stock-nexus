@@ -70,11 +70,11 @@ const menuItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const currentPath = location.pathname;
 
   const filteredMenuItems = menuItems.filter(item => 
-    user && item.roles.includes(user.role)
+    profile && item.roles.includes(profile.role)
   );
 
   const isCollapsed = state === "collapsed";
@@ -130,18 +130,20 @@ export function AppSidebar() {
       </SidebarContent>
 
       <div className="p-4 border-t mt-auto bg-gray-50">
-        {!isCollapsed && user && (
+        {!isCollapsed && profile && (
           <div className="space-y-2">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-bold">{user.name.charAt(0)}</span>
+                <span className="text-white text-sm font-bold">
+                  {profile.full_name?.charAt(0) || 'U'}
+                </span>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                <p className="text-xs text-gray-500">{user.role}</p>
+                <p className="text-sm font-medium text-gray-900">{profile.full_name || 'Utilisateur'}</p>
+                <p className="text-xs text-gray-500">{profile.role}</p>
               </div>
             </div>
-            <p className="text-xs text-gray-400">{user.department}</p>
+            <p className="text-xs text-gray-400">{profile.department || 'Non défini'}</p>
           </div>
         )}
       </div>
