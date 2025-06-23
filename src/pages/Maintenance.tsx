@@ -1,82 +1,30 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Settings, Plus, Calendar, User, Trash2 } from 'lucide-react';
+import { Settings, Plus, Calendar, User, Trash2, Edit } from 'lucide-react';
+import { useMaintenance, MaintenanceRecord } from '@/hooks/useMaintenance';
+import { useAuth } from '@/contexts/AuthContext';
 import { MaintenanceDialog } from '@/components/MaintenanceDialog';
 import { MaintenanceDeleteDialog } from '@/components/MaintenanceDeleteDialog';
 import { useToast } from '@/hooks/use-toast';
 
-interface MaintenanceItem {
-  id: string;
-  item: string;
-  category: string;
-  problem: string;
-  technician: string;
-  startDate: string;
-  endDate: string;
-  status: string;
-  parkNumber?: string;
-  serialNumber?: string;
-}
-
-interface MaintenanceEditItem {
-  id: string;
-  item: string;
-  category: string;
-  problem: string;
-  technician: string;
-  startDate: Date;
-  endDate?: Date;
-  status: 'en_cours' | 'terminee' | 'en_retard';
-  parkNumber?: string;
-  serialNumber?: string;
-}
-
 const Maintenance = () => {
-  const [maintenanceItems, setMaintenanceItems] = useState<MaintenanceItem[]>([]);
+  const { maintenanceRecords, isLoading, createMaintenanceRecord, updateMaintenanceRecord, deleteMaintenanceRecord } = useMaintenance();
+  const { hasPermission } = useAuth();
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [editingItem, setEditingItem] = useState<MaintenanceEditItem | null>(null);
-  const [deletingItem, setDeletingItem] = useState<MaintenanceItem | null>(null);
+  const [editingItem, setEditingItem] = useState<MaintenanceRecord | null>(null);
+  const [deletingItem, setDeletingItem] = useState<MaintenanceRecord | null>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    // Load maintenance items from localStorage
-    const storedItems = JSON.parse(localStorage.getItem('maintenanceItems') || '[]');
-    
-    // Default items for demonstration
-    const defaultItems = [
-      {
-        id: '1',
-        item: 'Dell Latitude 5520',
-        category: 'Ordinateurs',
-        problem: 'Écran défaillant',
-        technician: 'Jean Technicien',
-        startDate: '2024-01-15',
-        endDate: '2024-01-20',
-        status: 'en_cours'
-      },
-      {
-        id: '2',
-        item: 'HP Imprimante Pro',
-        category: 'Imprimantes',
-        problem: 'Bourrage papier récurrent',
-        technician: 'Marie Support',
-        startDate: '2024-01-10',
-        endDate: '2024-01-18',
-        status: 'terminee'
-      }
-    ];
-
-    setMaintenanceItems([...defaultItems, ...storedItems]);
-  }, []);
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      en_cours: { label: 'En cours', className: 'bg-yellow-100 text-yellow-800' },
-      terminee: { label: 'Terminée', className: 'bg-green-100 text-green-800' },
-      en_retard: { label: 'En retard', className: 'bg-red-100 text-red-800' }
+      scheduled: { label: 'Planifiée', className: 'bg-blue-100 text-blue-800' },
+      in_progress: { label: 'En cours', className: 'bg-yellow-100 text-yellow-800' },
+      completed: { label: 'Terminée', className: 'bg-green-100 text-green-800' },
+      cancelled: { label: 'Annulée', className: 'bg-red-100 text-red-800' }
     };
     
     return (
@@ -86,59 +34,73 @@ const Maintenance = () => {
     );
   };
 
-  const handleCreateMaintenance = (data: any) => {
-    const newItem: MaintenanceItem = {
-      ...data,
-      id: Date.now().toString(),
-      startDate: data.startDate.toISOString().split('T')[0],
-      endDate: data.endDate ? data.endDate.toISOString().split('T')[0] : '',
+  const getPriorityBadge = (priority: string) => {
+    const priorityConfig = {
+      low: { label: 'Basse', className: 'bg-gray-100 text-gray-800' },
+      medium: { label: 'Moyenne', className: 'bg-blue-100 text-blue-800' },
+      high: { label: 'Haute', className: 'bg-orange-100 text-orange-800' },
+      critical: { label: 'Critique', className: 'bg-red-100 text-red-800' }
     };
-    const updatedItems = [newItem, ...maintenanceItems];
-    setMaintenanceItems(updatedItems);
-    localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems.slice(2))); // Exclude default items
-  };
-
-  const handleEditMaintenance = (data: any) => {
-    const updatedItems = maintenanceItems.map(item =>
-      item.id === data.id ? {
-        ...data,
-        startDate: data.startDate.toISOString().split('T')[0],
-        endDate: data.endDate ? data.endDate.toISOString().split('T')[0] : '',
-      } : item
-    );
-    setMaintenanceItems(updatedItems);
-    localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems.slice(2))); // Exclude default items
-    setEditingItem(null);
-  };
-
-  const handleCloseItem = (id: string) => {
-    const updatedItems = maintenanceItems.map(item =>
-      item.id === id ? { ...item, status: 'terminee' } : item
-    );
-    setMaintenanceItems(updatedItems);
-    localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems.slice(2))); // Exclude default items
     
-    const item = maintenanceItems.find(i => i.id === id);
-    toast({
-      title: 'Maintenance clôturée',
-      description: `La maintenance pour ${item?.item} a été marquée comme terminée.`,
+    return (
+      <Badge className={priorityConfig[priority as keyof typeof priorityConfig].className}>
+        {priorityConfig[priority as keyof typeof priorityConfig].label}
+      </Badge>
+    );
+  };
+
+  const handleCreateMaintenance = async (data: any) => {
+    await createMaintenanceRecord.mutateAsync({
+      equipment_name: data.item,
+      maintenance_type: 'corrective',
+      description: data.problem,
+      scheduled_date: data.startDate.toISOString().split('T')[0],
+      completed_date: data.endDate ? data.endDate.toISOString().split('T')[0] : undefined,
+      status: data.status,
+      priority: 'medium',
     });
   };
 
-  const handleDeleteItem = (item: MaintenanceItem) => {
+  const handleEditMaintenance = async (data: any) => {
+    if (editingItem) {
+      await updateMaintenanceRecord.mutateAsync({
+        id: editingItem.id,
+        equipment_name: data.item,
+        description: data.problem,
+        scheduled_date: data.startDate.toISOString().split('T')[0],
+        completed_date: data.endDate ? data.endDate.toISOString().split('T')[0] : undefined,
+        status: data.status,
+      });
+      setEditingItem(null);
+    }
+  };
+
+  const handleCloseItem = async (id: string) => {
+    await updateMaintenanceRecord.mutateAsync({
+      id,
+      status: 'completed',
+      completed_date: new Date().toISOString().split('T')[0],
+    });
+    
+    const item = maintenanceRecords.find(i => i.id === id);
+    toast({
+      title: 'Maintenance clôturée',
+      description: `La maintenance pour ${item?.equipment_name} a été marquée comme terminée.`,
+    });
+  };
+
+  const handleDeleteItem = (item: MaintenanceRecord) => {
     setDeletingItem(item);
     setShowDeleteDialog(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deletingItem) {
-      const updatedItems = maintenanceItems.filter(item => item.id !== deletingItem.id);
-      setMaintenanceItems(updatedItems);
-      localStorage.setItem('maintenanceItems', JSON.stringify(updatedItems.slice(2))); // Exclude default items
+      await deleteMaintenanceRecord.mutateAsync(deletingItem.id);
       
       toast({
         title: 'Maintenance supprimée',
-        description: `La maintenance pour ${deletingItem.item} a été supprimée.`,
+        description: `La maintenance pour ${deletingItem.equipment_name} a été supprimée.`,
       });
       
       setDeletingItem(null);
@@ -146,15 +108,18 @@ const Maintenance = () => {
     }
   };
 
-  const openEditDialog = (item: MaintenanceItem) => {
-    // Convert MaintenanceItem to MaintenanceEditItem with proper Date objects and type assertion for status
-    const editData: MaintenanceEditItem = {
-      ...item,
-      startDate: new Date(item.startDate),
-      endDate: item.endDate ? new Date(item.endDate) : undefined,
-      status: item.status as 'en_cours' | 'terminee' | 'en_retard',
+  const openEditDialog = (item: MaintenanceRecord) => {
+    const editData = {
+      id: item.id,
+      item: item.equipment_name,
+      category: 'Équipement',
+      problem: item.description,
+      technician: 'À assigner',
+      startDate: new Date(item.scheduled_date),
+      endDate: item.completed_date ? new Date(item.completed_date) : undefined,
+      status: item.status as 'scheduled' | 'in_progress' | 'completed',
     };
-    setEditingItem(editData);
+    setEditingItem(item);
     setShowDialog(true);
   };
 
@@ -162,6 +127,19 @@ const Maintenance = () => {
     setShowDialog(false);
     setEditingItem(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg animate-pulse">
+            <Settings className="h-8 w-8 text-white" />
+          </div>
+          <p className="text-gray-600">Chargement des maintenances...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -177,24 +155,17 @@ const Maintenance = () => {
       </div>
 
       <div className="grid gap-4">
-        {maintenanceItems.map((item) => (
+        {maintenanceRecords.map((item) => (
           <Card key={item.id} className="shadow-lg">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Settings className="h-5 w-5" />
-                    {item.item}
-                    {item.parkNumber && (
-                      <Badge variant="outline" className="text-xs">
-                        {item.parkNumber}
-                      </Badge>
-                    )}
+                    {item.equipment_name}
+                    {getPriorityBadge(item.priority)}
                   </CardTitle>
-                  <CardDescription>{item.category} - {item.problem}</CardDescription>
-                  {item.serialNumber && (
-                    <p className="text-xs text-muted-foreground mt-1">N° Série: {item.serialNumber}</p>
-                  )}
+                  <CardDescription>{item.maintenance_type} - {item.description}</CardDescription>
                 </div>
                 {getStatusBadge(item.status)}
               </div>
@@ -203,45 +174,57 @@ const Maintenance = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm font-medium flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Technicien
-                  </p>
-                  <p className="text-sm text-muted-foreground">{item.technician}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    Date de début
-                  </p>
-                  <p className="text-sm text-muted-foreground">{new Date(item.startDate).toLocaleDateString('fr-FR')}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Date prévue de fin
+                    Date prévue
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {item.endDate ? new Date(item.endDate).toLocaleDateString('fr-FR') : 'Non définie'}
+                    {new Date(item.scheduled_date).toLocaleDateString('fr-FR')}
                   </p>
                 </div>
+                {item.completed_date && (
+                  <div>
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Date de fin
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(item.completed_date).toLocaleDateString('fr-FR')}
+                    </p>
+                  </div>
+                )}
+                {item.cost && (
+                  <div>
+                    <p className="text-sm font-medium">Coût</p>
+                    <p className="text-sm text-muted-foreground">{item.cost}€</p>
+                  </div>
+                )}
               </div>
+              {item.notes && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium">Notes</p>
+                  <p className="text-sm text-muted-foreground">{item.notes}</p>
+                </div>
+              )}
               <div className="flex gap-2 mt-4">
                 <Button variant="outline" size="sm" onClick={() => openEditDialog(item)}>
+                  <Edit className="h-4 w-4 mr-2" />
                   Modifier
                 </Button>
-                {item.status !== 'terminee' && (
+                {item.status !== 'completed' && (
                   <Button variant="outline" size="sm" onClick={() => handleCloseItem(item.id)}>
                     Clôturer
                   </Button>
                 )}
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => handleDeleteItem(item)}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {hasPermission('admin') && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleDeleteItem(item)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -252,7 +235,16 @@ const Maintenance = () => {
         isOpen={showDialog}
         onClose={closeDialog}
         onSubmit={editingItem ? handleEditMaintenance : handleCreateMaintenance}
-        initialData={editingItem || undefined}
+        initialData={editingItem ? {
+          id: editingItem.id,
+          item: editingItem.equipment_name,
+          category: 'Équipement',
+          problem: editingItem.description,
+          technician: 'À assigner',
+          startDate: new Date(editingItem.scheduled_date),
+          endDate: editingItem.completed_date ? new Date(editingItem.completed_date) : undefined,
+          status: editingItem.status as 'scheduled' | 'in_progress' | 'completed',
+        } : undefined}
         mode={editingItem ? 'edit' : 'create'}
       />
 
@@ -263,7 +255,7 @@ const Maintenance = () => {
           setDeletingItem(null);
         }}
         onConfirm={confirmDelete}
-        itemName={deletingItem?.item || ''}
+        itemName={deletingItem?.equipment_name || ''}
       />
     </div>
   );

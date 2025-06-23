@@ -60,6 +60,56 @@ export type Database = {
         }
         Relationships: []
       }
+      equipment_assignments: {
+        Row: {
+          assigned_date: string
+          created_at: string | null
+          employee_id: string | null
+          equipment_name: string
+          id: string
+          notes: string | null
+          park_number: string
+          returned_date: string | null
+          serial_number: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_date?: string
+          created_at?: string | null
+          employee_id?: string | null
+          equipment_name: string
+          id?: string
+          notes?: string | null
+          park_number: string
+          returned_date?: string | null
+          serial_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_date?: string
+          created_at?: string | null
+          employee_id?: string | null
+          equipment_name?: string
+          id?: string
+          notes?: string | null
+          park_number?: string
+          returned_date?: string | null
+          serial_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maintenance_records: {
         Row: {
           completed_date: string | null
@@ -140,6 +190,7 @@ export type Database = {
       }
       stock_items: {
         Row: {
+          assigned_to: string | null
           category: string
           created_at: string | null
           description: string | null
@@ -147,7 +198,9 @@ export type Database = {
           location: string | null
           minimum_quantity: number | null
           name: string
+          park_number: string | null
           quantity: number
+          serial_number: string | null
           sku: string
           status: string | null
           supplier: string | null
@@ -155,6 +208,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          assigned_to?: string | null
           category: string
           created_at?: string | null
           description?: string | null
@@ -162,7 +216,9 @@ export type Database = {
           location?: string | null
           minimum_quantity?: number | null
           name: string
+          park_number?: string | null
           quantity?: number
+          serial_number?: string | null
           sku: string
           status?: string | null
           supplier?: string | null
@@ -170,6 +226,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          assigned_to?: string | null
           category?: string
           created_at?: string | null
           description?: string | null
@@ -177,12 +234,46 @@ export type Database = {
           location?: string | null
           minimum_quantity?: number | null
           name?: string
+          park_number?: string | null
           quantity?: number
+          serial_number?: string | null
           sku?: string
           status?: string | null
           supplier?: string | null
           unit_price?: number | null
           updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_items_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          granted_at: string | null
+          granted_by: string | null
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          role?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -191,7 +282,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_role: {
+        Args: { check_user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

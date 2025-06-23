@@ -1,677 +1,357 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Package, Plus, Edit, Trash2, AlertTriangle, Hash } from 'lucide-react';
+import { useStock, StockItem } from '@/hooks/useStock';
 import { useAuth } from '@/contexts/AuthContext';
-import { Search, Plus, Edit, Trash2, Package, AlertTriangle, AlertCircle, ShieldAlert } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
-import { MaintenanceForm, MaintenanceData } from '@/components/MaintenanceForm';
-
-// Données de démonstration
-const initialCategories = [
-  {
-    id: '1',
-    name: 'Ordinateurs',
-    criticalThreshold: 10,
-    articles: [
-      { id: '1', model: 'Dell Latitude 5520', parkNumber: 'PC001', serialNumber: 'DL5520001', status: 'disponible' },
-      { id: '2', model: 'HP EliteBook 840', parkNumber: 'PC002', serialNumber: 'HP840002', status: 'alloué' },
-      { id: '3', model: 'Lenovo ThinkPad T14', parkNumber: 'PC003', serialNumber: 'LT14003', status: 'maintenance' },
-    ]
-  },
-  {
-    id: '2',
-    name: 'Smartphones',
-    criticalThreshold: 5,
-    articles: [
-      { id: '4', model: 'iPhone 13', parkNumber: 'SP001', serialNumber: 'IP13001', status: 'disponible' },
-      { id: '5', model: 'Samsung Galaxy S21', parkNumber: 'SP002', serialNumber: 'SG21002', status: 'alloué' },
-    ]
-  }
-];
 
 const Stock = () => {
-  const [categories, setCategories] = useState(initialCategories);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
-  const [isAddArticleOpen, setIsAddArticleOpen] = useState(false);
-  const [isEditArticleOpen, setIsEditArticleOpen] = useState(false);
-  const [isEditThresholdOpen, setIsEditThresholdOpen] = useState(false);
-  const [isMaintenanceFormOpen, setIsMaintenanceFormOpen] = useState(false);
-  const [newCategory, setNewCategory] = useState({ name: '', threshold: '' });
-  const [newArticle, setNewArticle] = useState({
-    model: '',
-    parkNumber: '',
-    serialNumber: '',
-    categoryId: '',
-    status: 'disponible'
-  });
-  const [editingArticle, setEditingArticle] = useState({
-    id: '',
-    model: '',
-    parkNumber: '',
-    serialNumber: '',
-    status: 'disponible',
-    categoryId: ''
-  });
-  const [editingCategory, setEditingCategory] = useState({
-    id: '',
-    name: '',
-    criticalThreshold: 0
-  });
-  const [pendingMaintenanceArticle, setPendingMaintenanceArticle] = useState<any>(null);
+  const { stockItems, isLoading, createStockItem, updateStockItem, deleteStockItem } = useStock();
   const { hasPermission } = useAuth();
-  const { toast } = useToast();
-  const navigate = useNavigate();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    sku: '',
+    category: '',
+    quantity: '',
+    minimum_quantity: '',
+    unit_price: '',
+    supplier: '',
+    location: '',
+    park_number: '',
+    serial_number: '',
+    status: 'active' as const,
+  });
 
-  const canModify = hasPermission('admin');
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      description: '',
+      sku: '',
+      category: '',
+      quantity: '',
+      minimum_quantity: '',
+      unit_price: '',
+      supplier: '',
+      location: '',
+      park_number: '',
+      serial_number: '',
+      status: 'active',
+    });
+    setEditingItem(null);
+  };
 
-  const filteredCategories = categories.map(category => ({
-    ...category,
-    articles: category.articles.filter(article =>
-      article.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.parkNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.status.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  })).filter(category => category.articles.length > 0 || searchTerm === '');
+  const openEditDialog = (item: StockItem) => {
+    setEditingItem(item);
+    setFormData({
+      name: item.name,
+      description: item.description || '',
+      sku: item.sku,
+      category: item.category,
+      quantity: item.quantity.toString(),
+      minimum_quantity: item.minimum_quantity?.toString() || '',
+      unit_price: item.unit_price?.toString() || '',
+      supplier: item.supplier || '',
+      location: item.location || '',
+      park_number: item.park_number || '',
+      serial_number: item.serial_number || '',
+      status: item.status,
+    });
+    setDialogOpen(true);
+  };
 
-  const handleCreateCategory = () => {
-    if (!newCategory.name || !newCategory.threshold) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir tous les champs",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const category = {
-      id: Date.now().toString(),
-      name: newCategory.name,
-      criticalThreshold: parseInt(newCategory.threshold),
-      articles: []
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const itemData = {
+      ...formData,
+      quantity: parseInt(formData.quantity),
+      minimum_quantity: formData.minimum_quantity ? parseInt(formData.minimum_quantity) : undefined,
+      unit_price: formData.unit_price ? parseFloat(formData.unit_price) : undefined,
     };
 
-    setCategories([...categories, category]);
-    setNewCategory({ name: '', threshold: '' });
-    setIsAddCategoryOpen(false);
-    toast({
-      title: "Succès",
-      description: "Catégorie créée avec succès"
-    });
-  };
-
-  const handleAddArticle = () => {
-    if (!newArticle.model || !newArticle.parkNumber || !newArticle.serialNumber || !newArticle.categoryId) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir tous les champs",
-        variant: "destructive"
-      });
-      return;
+    if (editingItem) {
+      await updateStockItem.mutateAsync({ id: editingItem.id, ...itemData });
+    } else {
+      await createStockItem.mutateAsync(itemData);
     }
-
-    const article = {
-      id: Date.now().toString(),
-      model: newArticle.model,
-      parkNumber: newArticle.parkNumber,
-      serialNumber: newArticle.serialNumber,
-      status: newArticle.status
-    };
-
-    setCategories(categories.map(cat => 
-      cat.id === newArticle.categoryId 
-        ? { ...cat, articles: [...cat.articles, article] }
-        : cat
-    ));
-
-    setNewArticle({
-      model: '',
-      parkNumber: '',
-      serialNumber: '',
-      categoryId: '',
-      status: 'disponible'
-    });
-    setIsAddArticleOpen(false);
-    toast({
-      title: "Succès",
-      description: "Article ajouté avec succès"
-    });
+    
+    setDialogOpen(false);
+    resetForm();
   };
 
-  const handleEditArticle = (categoryId: string, article: any) => {
-    setEditingArticle({
-      id: article.id,
-      model: article.model,
-      parkNumber: article.parkNumber,
-      serialNumber: article.serialNumber,
-      status: article.status,
-      categoryId: categoryId
-    });
-    setIsEditArticleOpen(true);
-  };
-
-  const handleUpdateArticle = () => {
-    if (!editingArticle.model || !editingArticle.parkNumber || !editingArticle.serialNumber) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir tous les champs",
-        variant: "destructive"
-      });
-      return;
+  const handleDelete = async (id: string) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cet article ?')) {
+      await deleteStockItem.mutateAsync(id);
     }
-
-    // Check if status is changing to maintenance
-    const originalArticle = categories
-      .find(cat => cat.id === editingArticle.categoryId)
-      ?.articles.find(art => art.id === editingArticle.id);
-
-    if (editingArticle.status === 'maintenance' && originalArticle?.status !== 'maintenance') {
-      // Open maintenance form instead of updating directly
-      setPendingMaintenanceArticle(editingArticle);
-      setIsMaintenanceFormOpen(true);
-      return;
-    }
-
-    // Normal update for other status changes
-    setCategories(categories.map(cat => 
-      cat.id === editingArticle.categoryId 
-        ? { 
-            ...cat, 
-            articles: cat.articles.map(article =>
-              article.id === editingArticle.id
-                ? {
-                    ...article,
-                    model: editingArticle.model,
-                    parkNumber: editingArticle.parkNumber,
-                    serialNumber: editingArticle.serialNumber,
-                    status: editingArticle.status
-                  }
-                : article
-            )
-          }
-        : cat
-    ));
-
-    setIsEditArticleOpen(false);
-    toast({
-      title: "Succès",
-      description: "Article modifié avec succès"
-    });
-  };
-
-  const handleMaintenanceSubmit = (maintenanceData: MaintenanceData) => {
-    if (!pendingMaintenanceArticle) return;
-
-    // Update article status to maintenance
-    setCategories(categories.map(cat => 
-      cat.id === pendingMaintenanceArticle.categoryId 
-        ? { 
-            ...cat, 
-            articles: cat.articles.map(article =>
-              article.id === pendingMaintenanceArticle.id
-                ? {
-                    ...article,
-                    model: pendingMaintenanceArticle.model,
-                    parkNumber: pendingMaintenanceArticle.parkNumber,
-                    serialNumber: pendingMaintenanceArticle.serialNumber,
-                    status: 'maintenance'
-                  }
-                : article
-            )
-          }
-        : cat
-    ));
-
-    // Store maintenance data in localStorage
-    const maintenanceItem = {
-      id: Date.now().toString(),
-      item: pendingMaintenanceArticle.model,
-      category: categories.find(cat => cat.id === pendingMaintenanceArticle.categoryId)?.name || '',
-      problem: maintenanceData.problem,
-      technician: maintenanceData.technician,
-      startDate: maintenanceData.startDate.toISOString().split('T')[0],
-      endDate: maintenanceData.endDate?.toISOString().split('T')[0] || '',
-      status: 'en_cours',
-      parkNumber: pendingMaintenanceArticle.parkNumber,
-      serialNumber: pendingMaintenanceArticle.serialNumber
-    };
-
-    const existingMaintenance = JSON.parse(localStorage.getItem('maintenanceItems') || '[]');
-    localStorage.setItem('maintenanceItems', JSON.stringify([...existingMaintenance, maintenanceItem]));
-
-    setIsMaintenanceFormOpen(false);
-    setIsEditArticleOpen(false);
-    setPendingMaintenanceArticle(null);
-
-    toast({
-      title: "Succès",
-      description: "Article envoyé en maintenance avec succès"
-    });
-
-    // Navigate to maintenance page
-    navigate('/maintenance');
-  };
-
-  const handleEditThreshold = (category: any) => {
-    setEditingCategory({
-      id: category.id,
-      name: category.name,
-      criticalThreshold: category.criticalThreshold
-    });
-    setIsEditThresholdOpen(true);
-  };
-
-  const handleUpdateThreshold = () => {
-    if (!editingCategory.criticalThreshold || editingCategory.criticalThreshold < 0) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez entrer un seuil valide",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setCategories(categories.map(cat => 
-      cat.id === editingCategory.id 
-        ? { ...cat, criticalThreshold: editingCategory.criticalThreshold }
-        : cat
-    ));
-
-    setIsEditThresholdOpen(false);
-    toast({
-      title: "Succès",
-      description: "Seuil critique modifié avec succès"
-    });
-  };
-
-  const handleDeleteArticle = (categoryId: string, articleId: string) => {
-    setCategories(categories.map(cat => 
-      cat.id === categoryId 
-        ? { ...cat, articles: cat.articles.filter(article => article.id !== articleId) }
-        : cat
-    ));
-    toast({
-      title: "Succès",
-      description: "Article supprimé avec succès"
-    });
   };
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      disponible: { label: 'Disponible', className: 'bg-green-100 text-green-800 border-green-200' },
-      alloué: { label: 'Alloué', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-      maintenance: { label: 'Maintenance', className: 'bg-red-100 text-red-800 border-red-200' }
+      active: { label: 'Actif', className: 'bg-green-100 text-green-800' },
+      inactive: { label: 'Inactif', className: 'bg-yellow-100 text-yellow-800' },
+      discontinued: { label: 'Discontinué', className: 'bg-red-100 text-red-800' }
     };
     
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.disponible;
     return (
-      <Badge className={config.className}>
-        {config.label}
+      <Badge className={statusConfig[status as keyof typeof statusConfig].className}>
+        {statusConfig[status as keyof typeof statusConfig].label}
       </Badge>
     );
   };
 
-  const getCriticalStatus = (category: any) => {
-    const availableCount = category.articles.filter((a: any) => a.status === 'disponible').length;
-    return availableCount <= category.criticalThreshold;
+  const isLowStock = (item: StockItem) => {
+    return item.minimum_quantity && item.quantity <= item.minimum_quantity;
   };
 
-  const getCriticalIcon = (category: any) => {
-    const availableCount = category.articles.filter((a: any) => a.status === 'disponible').length;
-    const isCritical = availableCount <= category.criticalThreshold;
-    
-    if (!isCritical) return null;
-    
-    // Différentes icônes selon le niveau de criticité
-    if (availableCount === 0) {
-      return <ShieldAlert className="h-4 w-4 text-red-600" />;
-    } else if (availableCount <= Math.ceil(category.criticalThreshold * 0.5)) {
-      return <AlertCircle className="h-4 w-4 text-red-500" />;
-    } else {
-      return <AlertTriangle className="h-4 w-4 text-orange-500" />;
-    }
-  };
-
-  const getCriticalBadgeVariant = (category: any) => {
-    const availableCount = category.articles.filter((a: any) => a.status === 'disponible').length;
-    
-    if (availableCount === 0) {
-      return "destructive"; // Rouge foncé
-    } else if (availableCount <= Math.ceil(category.criticalThreshold * 0.5)) {
-      return "destructive"; // Rouge
-    } else {
-      return "secondary"; // Orange/Jaune
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg animate-pulse">
+            <Package className="h-8 w-8 text-white" />
+          </div>
+          <p className="text-gray-600">Chargement du stock...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-xl shadow-lg">
-        <div className="flex items-center space-x-3">
-          <Package className="h-8 w-8" />
-          <div>
-            <h1 className="text-3xl font-bold">Gestion du Stock</h1>
-            <p className="text-blue-100 mt-2">Gérez vos articles et catégories avec efficacité</p>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Stock</h1>
+          <p className="text-gray-600 mt-2">Gestion des articles en stock</p>
         </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={resetForm}>
+              <Plus className="h-4 w-4 mr-2" />
+              Ajouter un article
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editingItem ? 'Modifier' : 'Ajouter'} un article</DialogTitle>
+              <DialogDescription>
+                {editingItem ? 'Modifiez' : 'Ajoutez'} les informations de l'article.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label htmlFor="name">Nom de l'article</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="sku">SKU</Label>
+                  <Input
+                    id="sku"
+                    value={formData.sku}
+                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="category">Catégorie</Label>
+                  <Input
+                    id="category"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="quantity">Quantité</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    value={formData.quantity}
+                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="minimum_quantity">Quantité minimale</Label>
+                  <Input
+                    id="minimum_quantity"
+                    type="number"
+                    value={formData.minimum_quantity}
+                    onChange={(e) => setFormData({ ...formData, minimum_quantity: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="unit_price">Prix unitaire (€)</Label>
+                  <Input
+                    id="unit_price"
+                    type="number"
+                    step="0.01"
+                    value={formData.unit_price}
+                    onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="supplier">Fournisseur</Label>
+                  <Input
+                    id="supplier"
+                    value={formData.supplier}
+                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="location">Emplacement</Label>
+                  <Input
+                    id="location"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="park_number">Numéro de parc</Label>
+                  <Input
+                    id="park_number"
+                    value={formData.park_number}
+                    onChange={(e) => setFormData({ ...formData, park_number: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="serial_number">Numéro de série</Label>
+                  <Input
+                    id="serial_number"
+                    value={formData.serial_number}
+                    onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="status">Statut</Label>
+                  <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value as any })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Actif</SelectItem>
+                      <SelectItem value="inactive">Inactif</SelectItem>
+                      <SelectItem value="discontinued">Discontinué</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Annuler
+                </Button>
+                <Button type="submit">
+                  {editingItem ? 'Modifier' : 'Ajouter'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Barre de recherche et actions */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Rechercher un article..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
-          />
-        </div>
-        
-        {canModify && (
-          <div className="flex gap-2">
-            <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="border-2 border-gray-300 hover:border-blue-500">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nouvelle catégorie
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Ajouter une catégorie</DialogTitle>
-                  <DialogDescription>Créez une nouvelle catégorie d'articles</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="categoryName">Nom de la catégorie</Label>
-                    <Input 
-                      id="categoryName" 
-                      placeholder="Ex: Ordinateurs portables"
-                      value={newCategory.name}
-                      onChange={(e) => setNewCategory({...newCategory, name: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="threshold">Seuil critique</Label>
-                    <Input 
-                      id="threshold" 
-                      type="number" 
-                      placeholder="10"
-                      value={newCategory.threshold}
-                      onChange={(e) => setNewCategory({...newCategory, threshold: e.target.value})}
-                    />
-                  </div>
-                  <Button onClick={handleCreateCategory} className="w-full">
-                    Créer la catégorie
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={isAddArticleOpen} onOpenChange={setIsAddArticleOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nouvel article
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Ajouter un article</DialogTitle>
-                  <DialogDescription>Ajoutez un nouvel article au stock</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="model">Modèle</Label>
-                    <Input 
-                      id="model" 
-                      placeholder="Ex: Dell Latitude 5520"
-                      value={newArticle.model}
-                      onChange={(e) => setNewArticle({...newArticle, model: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="parkNumber">Numéro de parc</Label>
-                    <Input 
-                      id="parkNumber" 
-                      placeholder="Ex: PC001"
-                      value={newArticle.parkNumber}
-                      onChange={(e) => setNewArticle({...newArticle, parkNumber: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="serialNumber">Numéro de série</Label>
-                    <Input 
-                      id="serialNumber" 
-                      placeholder="Ex: DL5520001"
-                      value={newArticle.serialNumber}
-                      onChange={(e) => setNewArticle({...newArticle, serialNumber: e.target.value})}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="category">Catégorie</Label>
-                    <Select onValueChange={(value) => setNewArticle({...newArticle, categoryId: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner une catégorie" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map(category => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="status">Statut</Label>
-                    <Select onValueChange={(value) => setNewArticle({...newArticle, status: value})}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un statut" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="disponible">Disponible</SelectItem>
-                        <SelectItem value="alloué">Alloué</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button onClick={handleAddArticle} className="w-full">
-                    Ajouter l'article
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        )}
-      </div>
-
-      {/* Edit Article Dialog */}
-      <Dialog open={isEditArticleOpen} onOpenChange={setIsEditArticleOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Modifier l'article</DialogTitle>
-            <DialogDescription>Modifiez les informations de l'article</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="editModel">Modèle</Label>
-              <Input 
-                id="editModel" 
-                value={editingArticle.model}
-                onChange={(e) => setEditingArticle({...editingArticle, model: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="editParkNumber">Numéro de parc</Label>
-              <Input 
-                id="editParkNumber" 
-                value={editingArticle.parkNumber}
-                onChange={(e) => setEditingArticle({...editingArticle, parkNumber: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="editSerialNumber">Numéro de série</Label>
-              <Input 
-                id="editSerialNumber" 
-                value={editingArticle.serialNumber}
-                onChange={(e) => setEditingArticle({...editingArticle, serialNumber: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="editStatus">Statut</Label>
-              <Select value={editingArticle.status} onValueChange={(value) => setEditingArticle({...editingArticle, status: value})}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="disponible">Disponible</SelectItem>
-                  <SelectItem value="alloué">Alloué</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={handleUpdateArticle} className="w-full">
-              Modifier l'article
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Maintenance Form Dialog */}
-      <MaintenanceForm
-        isOpen={isMaintenanceFormOpen}
-        onClose={() => {
-          setIsMaintenanceFormOpen(false);
-          setPendingMaintenanceArticle(null);
-        }}
-        onSubmit={handleMaintenanceSubmit}
-        article={pendingMaintenanceArticle || { model: '', parkNumber: '', serialNumber: '' }}
-      />
-
-      {/* Edit Threshold Dialog */}
-      <Dialog open={isEditThresholdOpen} onOpenChange={setIsEditThresholdOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Modifier le seuil critique</DialogTitle>
-            <DialogDescription>Modifiez le seuil critique pour {editingCategory.name}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="editThreshold">Seuil critique</Label>
-              <Input 
-                id="editThreshold" 
-                type="number"
-                value={editingCategory.criticalThreshold}
-                onChange={(e) => setEditingCategory({...editingCategory, criticalThreshold: parseInt(e.target.value) || 0})}
-              />
-            </div>
-            <Button onClick={handleUpdateThreshold} className="w-full">
-              Modifier le seuil
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Liste des catégories */}
-      <div className="space-y-6">
-        {filteredCategories.map(category => {
-          const isCritical = getCriticalStatus(category);
-          const availableCount = category.articles.filter(a => a.status === 'disponible').length;
-          const criticalIcon = getCriticalIcon(category);
-          const badgeVariant = getCriticalBadgeVariant(category);
-          
-          return (
-            <Card key={category.id} className={`shadow-lg ${isCritical ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
-              <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Package className="h-5 w-5 text-blue-600" />
-                      {category.name}
-                      {isCritical && (
-                        <Badge variant={badgeVariant} className="flex items-center gap-1">
-                          {criticalIcon}
-                          Critique
-                        </Badge>
-                      )}
-                    </CardTitle>
-                    <CardDescription>
-                      {category.articles.length} articles au total - {availableCount} disponibles
-                      {isCritical && ` (Seuil: ${category.criticalThreshold})`}
-                    </CardDescription>
-                  </div>
-                  {canModify && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="border-blue-300 text-blue-600 hover:bg-blue-50"
-                      onClick={() => handleEditThreshold(category)}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Modifier seuil
-                    </Button>
+      <div className="grid gap-4">
+        {stockItems.map((item) => (
+          <Card key={item.id} className={`shadow-lg ${isLowStock(item) ? 'border-orange-200 bg-orange-50' : ''}`}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    {item.name}
+                    {item.park_number && (
+                      <Badge variant="outline" className="text-xs">
+                        {item.park_number}
+                      </Badge>
+                    )}
+                    {isLowStock(item) && (
+                      <Badge className="bg-orange-100 text-orange-800">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Stock bas
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription>{item.category} - SKU: {item.sku}</CardDescription>
+                  {item.description && (
+                    <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
                   )}
                 </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="text-left p-4 font-semibold text-gray-700">Modèle</th>
-                        <th className="text-left p-4 font-semibold text-gray-700">N° Parc</th>
-                        <th className="text-left p-4 font-semibold text-gray-700">N° Série</th>
-                        <th className="text-left p-4 font-semibold text-gray-700">Statut</th>
-                        {canModify && <th className="text-left p-4 font-semibold text-gray-700">Actions</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {category.articles.map(article => (
-                        <tr key={article.id} className="border-b hover:bg-gray-50 transition-colors">
-                          <td className="p-4 font-medium">{article.model}</td>
-                          <td className="p-4 text-gray-600">{article.parkNumber}</td>
-                          <td className="p-4 text-gray-600">{article.serialNumber}</td>
-                          <td className="p-4">{getStatusBadge(article.status)}</td>
-                          {canModify && (
-                            <td className="p-4">
-                              <div className="flex gap-2">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="text-blue-600 hover:bg-blue-50"
-                                  onClick={() => handleEditArticle(category.id, article)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="text-red-600 hover:bg-red-50"
-                                  onClick={() => handleDeleteArticle(category.id, article.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                {getStatusBadge(item.status)}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm font-medium">Quantité</p>
+                  <p className="text-lg font-bold">{item.quantity}</p>
+                  {item.minimum_quantity && (
+                    <p className="text-xs text-muted-foreground">Min: {item.minimum_quantity}</p>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                {item.unit_price && (
+                  <div>
+                    <p className="text-sm font-medium">Prix unitaire</p>
+                    <p className="text-sm text-muted-foreground">{item.unit_price}€</p>
+                  </div>
+                )}
+                {item.location && (
+                  <div>
+                    <p className="text-sm font-medium">Emplacement</p>
+                    <p className="text-sm text-muted-foreground">{item.location}</p>
+                  </div>
+                )}
+                {item.serial_number && (
+                  <div>
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <Hash className="h-3 w-3" />
+                      N° Série
+                    </p>
+                    <p className="text-sm text-muted-foreground">{item.serial_number}</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button variant="outline" size="sm" onClick={() => openEditDialog(item)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Modifier
+                </Button>
+                {hasPermission('admin') && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleDelete(item.id)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Supprimer
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );

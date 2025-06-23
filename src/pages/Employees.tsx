@@ -1,439 +1,319 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Users, Plus, Edit, Trash2, Phone, Mail, Calendar, Building } from 'lucide-react';
+import { useEmployees, Employee } from '@/hooks/useEmployees';
 import { useAuth } from '@/contexts/AuthContext';
-import { Search, Plus, Edit, Trash2, Users, Calendar } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-
-// Données de démonstration
-const initialEmployees = [
-  {
-    id: '1',
-    name: 'Marie Dupont',
-    department: 'Ressources Humaines',
-    assignedItems: [
-      { parkNumber: 'PC001', model: 'Dell Latitude 5520', assignDate: '2024-01-15' },
-      { parkNumber: 'SP001', model: 'iPhone 13', assignDate: '2024-01-20' }
-    ]
-  },
-  {
-    id: '2',
-    name: 'Jean Martin',
-    department: 'IT',
-    assignedItems: [
-      { parkNumber: 'PC002', model: 'HP EliteBook 840', assignDate: '2024-02-01' }
-    ]
-  },
-  {
-    id: '3',
-    name: 'Sophie Bernard',
-    department: 'Marketing',
-    assignedItems: [
-      { parkNumber: 'SP002', model: 'Samsung Galaxy S21', assignDate: '2024-02-10' }
-    ]
-  }
-];
 
 const Employees = () => {
-  const [employees, setEmployees] = useState(initialEmployees);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
-  const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
-  const [newEmployee, setNewEmployee] = useState({
-    name: '',
-    department: '',
-    equipment: '',
-    assignDate: ''
-  });
-  const [editingEmployee, setEditingEmployee] = useState({
-    id: '',
-    name: '',
-    department: '',
-    equipment: '',
-    assignDate: ''
-  });
+  const { employees, isLoading, createEmployee, updateEmployee, deleteEmployee } = useEmployees();
   const { hasPermission } = useAuth();
-  const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [formData, setFormData] = useState({
+    employee_number: '',
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
+    position: '',
+    department: '',
+    hire_date: '',
+    salary: '',
+    status: 'active' as const,
+  });
 
-  const canModify = hasPermission('admin');
+  const resetForm = () => {
+    setFormData({
+      employee_number: '',
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone: '',
+      position: '',
+      department: '',
+      hire_date: '',
+      salary: '',
+      status: 'active',
+    });
+    setEditingEmployee(null);
+  };
 
-  const filteredEmployees = employees.filter(employee =>
-    employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    employee.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const openEditDialog = (employee: Employee) => {
+    setEditingEmployee(employee);
+    setFormData({
+      employee_number: employee.employee_number,
+      first_name: employee.first_name,
+      last_name: employee.last_name,
+      email: employee.email,
+      phone: employee.phone || '',
+      position: employee.position,
+      department: employee.department,
+      hire_date: employee.hire_date,
+      salary: employee.salary?.toString() || '',
+      status: employee.status,
+    });
+    setDialogOpen(true);
+  };
 
-  const handleAddEmployee = () => {
-    if (!newEmployee.name || !newEmployee.department) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir au moins le nom et le département",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const employee = {
-      id: Date.now().toString(),
-      name: newEmployee.name,
-      department: newEmployee.department,
-      assignedItems: newEmployee.equipment ? [{
-        parkNumber: newEmployee.equipment,
-        model: 'Équipement assigné',
-        assignDate: newEmployee.assignDate || new Date().toISOString().split('T')[0]
-      }] : []
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const employeeData = {
+      ...formData,
+      salary: formData.salary ? parseFloat(formData.salary) : undefined,
     };
 
-    setEmployees([...employees, employee]);
-    setNewEmployee({ name: '', department: '', equipment: '', assignDate: '' });
-    setIsAddEmployeeOpen(false);
-    toast({
-      title: "Succès",
-      description: "Employé ajouté avec succès"
-    });
-  };
-
-  const handleEditEmployee = (employee: any) => {
-    setEditingEmployee({
-      id: employee.id,
-      name: employee.name,
-      department: employee.department,
-      equipment: employee.assignedItems.length > 0 ? employee.assignedItems[0].parkNumber : '',
-      assignDate: employee.assignedItems.length > 0 ? employee.assignedItems[0].assignDate : ''
-    });
-    setIsEditEmployeeOpen(true);
-  };
-
-  const handleUpdateEmployee = () => {
-    if (!editingEmployee.name || !editingEmployee.department) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir au moins le nom et le département",
-        variant: "destructive"
-      });
-      return;
+    if (editingEmployee) {
+      await updateEmployee.mutateAsync({ id: editingEmployee.id, ...employeeData });
+    } else {
+      await createEmployee.mutateAsync(employeeData);
     }
-
-    setEmployees(employees.map(emp => 
-      emp.id === editingEmployee.id 
-        ? {
-            ...emp,
-            name: editingEmployee.name,
-            department: editingEmployee.department,
-            assignedItems: editingEmployee.equipment ? [{
-              parkNumber: editingEmployee.equipment,
-              model: 'Équipement assigné',
-              assignDate: editingEmployee.assignDate || new Date().toISOString().split('T')[0]
-            }] : []
-          }
-        : emp
-    ));
-
-    setIsEditEmployeeOpen(false);
-    toast({
-      title: "Succès",
-      description: "Employé modifié avec succès"
-    });
-  };
-
-  const handleDeleteEmployee = (employeeId: string) => {
-    setEmployees(employees.filter(emp => emp.id !== employeeId));
-    toast({
-      title: "Succès",
-      description: "Employé supprimé avec succès"
-    });
-  };
-
-  const getDepartmentStats = () => {
-    const departments = employees.reduce((acc, emp) => {
-      acc[emp.department] = (acc[emp.department] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
     
-    return Object.entries(departments).map(([dept, count]) => ({ dept, count }));
+    setDialogOpen(false);
+    resetForm();
   };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cet employé ?')) {
+      await deleteEmployee.mutateAsync(id);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      active: { label: 'Actif', className: 'bg-green-100 text-green-800' },
+      inactive: { label: 'Inactif', className: 'bg-yellow-100 text-yellow-800' },
+      terminated: { label: 'Licencié', className: 'bg-red-100 text-red-800' }
+    };
+    
+    return (
+      <Badge className={statusConfig[status as keyof typeof statusConfig].className}>
+        {statusConfig[status as keyof typeof statusConfig].label}
+      </Badge>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg animate-pulse">
+            <Users className="h-8 w-8 text-white" />
+          </div>
+          <p className="text-gray-600">Chargement des employés...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-xl shadow-lg">
-        <div className="flex items-center space-x-3">
-          <Users className="h-8 w-8" />
-          <div>
-            <h1 className="text-3xl font-bold">Gestion des Employés</h1>
-            <p className="text-purple-100 mt-2">Gérez les employés et leurs équipements attribués</p>
-          </div>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Employés</h1>
+          <p className="text-gray-600 mt-2">Gestion des employés de l'entreprise</p>
         </div>
-      </div>
-
-      {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-2 border-gray-200 hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Employés</CardTitle>
-            <Users className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{employees.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-gray-200 hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Départements</CardTitle>
-            <Users className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{getDepartmentStats().length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-gray-200 hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Équipements Attribués</CardTitle>
-            <Users className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {employees.reduce((total, emp) => total + emp.assignedItems.length, 0)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Barre de recherche et actions */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Rechercher un employé..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 border-2 border-gray-200 focus:border-purple-500 rounded-lg"
-          />
-        </div>
-        
-        {canModify && (
-          <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
+        {hasPermission('admin') && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+              <Button onClick={resetForm}>
                 <Plus className="h-4 w-4 mr-2" />
-                Nouvel employé
+                Ajouter un employé
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Ajouter un employé</DialogTitle>
-                <DialogDescription>Ajoutez un nouvel employé au système</DialogDescription>
+                <DialogTitle>{editingEmployee ? 'Modifier' : 'Ajouter'} un employé</DialogTitle>
+                <DialogDescription>
+                  {editingEmployee ? 'Modifiez' : 'Ajoutez'} les informations de l'employé.
+                </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="employeeName">Nom de l'employé</Label>
-                  <Input 
-                    id="employeeName" 
-                    placeholder="Ex: Marie Dupont"
-                    value={newEmployee.name}
-                    onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="department">Département</Label>
-                  <Input 
-                    id="department" 
-                    placeholder="Ex: Ressources Humaines"
-                    value={newEmployee.department}
-                    onChange={(e) => setNewEmployee({...newEmployee, department: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="equipment">Équipement attribué (optionnel)</Label>
-                  <Input 
-                    id="equipment" 
-                    placeholder="Ex: PC001"
-                    value={newEmployee.equipment}
-                    onChange={(e) => setNewEmployee({...newEmployee, equipment: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="assignDate">Date d'attribution</Label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input 
-                      id="assignDate" 
-                      type="date" 
-                      className="pl-10"
-                      value={newEmployee.assignDate}
-                      onChange={(e) => setNewEmployee({...newEmployee, assignDate: e.target.value})}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="employee_number">Numéro d'employé</Label>
+                    <Input
+                      id="employee_number"
+                      value={formData.employee_number}
+                      onChange={(e) => setFormData({ ...formData, employee_number: e.target.value })}
+                      required
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Laissez vide pour utiliser la date actuelle
-                  </p>
+                  <div>
+                    <Label htmlFor="status">Statut</Label>
+                    <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value as any })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Actif</SelectItem>
+                        <SelectItem value="inactive">Inactif</SelectItem>
+                        <SelectItem value="terminated">Licencié</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="first_name">Prénom</Label>
+                    <Input
+                      id="first_name"
+                      value={formData.first_name}
+                      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="last_name">Nom</Label>
+                    <Input
+                      id="last_name"
+                      value={formData.last_name}
+                      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Téléphone</Label>
+                    <Input
+                      id="phone"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="position">Poste</Label>
+                    <Input
+                      id="position"
+                      value={formData.position}
+                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="department">Département</Label>
+                    <Input
+                      id="department"
+                      value={formData.department}
+                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="hire_date">Date d'embauche</Label>
+                    <Input
+                      id="hire_date"
+                      type="date"
+                      value={formData.hire_date}
+                      onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="salary">Salaire</Label>
+                    <Input
+                      id="salary"
+                      type="number"
+                      value={formData.salary}
+                      onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <Button onClick={handleAddEmployee} className="w-full">
-                  Ajouter l'employé
-                </Button>
-              </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                    Annuler
+                  </Button>
+                  <Button type="submit">
+                    {editingEmployee ? 'Modifier' : 'Ajouter'}
+                  </Button>
+                </DialogFooter>
+              </form>
             </DialogContent>
           </Dialog>
         )}
       </div>
 
-      {/* Edit Employee Dialog */}
-      <Dialog open={isEditEmployeeOpen} onOpenChange={setIsEditEmployeeOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Modifier l'employé</DialogTitle>
-            <DialogDescription>Modifiez les informations de l'employé</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="editEmployeeName">Nom de l'employé</Label>
-              <Input 
-                id="editEmployeeName" 
-                value={editingEmployee.name}
-                onChange={(e) => setEditingEmployee({...editingEmployee, name: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="editDepartment">Département</Label>
-              <Input 
-                id="editDepartment" 
-                value={editingEmployee.department}
-                onChange={(e) => setEditingEmployee({...editingEmployee, department: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="editEquipment">Équipement attribué</Label>
-              <Input 
-                id="editEquipment" 
-                value={editingEmployee.equipment}
-                onChange={(e) => setEditingEmployee({...editingEmployee, equipment: e.target.value})}
-              />
-            </div>
-            <div>
-              <Label htmlFor="editAssignDate">Date d'attribution</Label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input 
-                  id="editAssignDate" 
-                  type="date" 
-                  className="pl-10"
-                  value={editingEmployee.assignDate}
-                  onChange={(e) => setEditingEmployee({...editingEmployee, assignDate: e.target.value})}
-                />
-              </div>
-            </div>
-            <Button onClick={handleUpdateEmployee} className="w-full">
-              Modifier l'employé
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Répartition par département */}
-      <Card className="shadow-lg border-2 border-gray-200">
-        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-purple-600" />
-            Répartition par département
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <div className="flex flex-wrap gap-2">
-            {getDepartmentStats().map(({ dept, count }) => (
-              <Badge key={dept} variant="outline" className="px-3 py-1 border-purple-200 text-purple-700">
-                {dept}: {count} employé{count > 1 ? 's' : ''}
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Liste des employés */}
       <div className="grid gap-4">
-        {filteredEmployees.map(employee => (
-          <Card key={employee.id} className="shadow-lg border-2 border-gray-200 hover:shadow-xl transition-shadow">
-            <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
+        {employees.map((employee) => (
+          <Card key={employee.id} className="shadow-lg">
+            <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm font-bold">{employee.name.charAt(0)}</span>
-                    </div>
-                    {employee.name}
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    {employee.first_name} {employee.last_name}
+                    <Badge variant="outline" className="text-xs">
+                      {employee.employee_number}
+                    </Badge>
                   </CardTitle>
-                  <CardDescription className="text-purple-600 font-medium">{employee.department}</CardDescription>
+                  <CardDescription>{employee.position} - {employee.department}</CardDescription>
                 </div>
-                {canModify && (
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-blue-600 hover:bg-blue-50 border-blue-300"
-                      onClick={() => handleEditEmployee(employee)}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Modifier
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-red-600 hover:bg-red-50 border-red-300"
-                      onClick={() => handleDeleteEmployee(employee.id)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Supprimer
-                    </Button>
-                  </div>
-                )}
+                {getStatusBadge(employee.status)}
               </div>
             </CardHeader>
-            <CardContent className="p-6">
-              <div>
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  Équipements attribués:
-                </h4>
-                {employee.assignedItems.length > 0 ? (
-                  <div className="space-y-2">
-                    {employee.assignedItems.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
-                        <div>
-                          <p className="font-medium text-gray-800">{item.model}</p>
-                          <p className="text-sm text-gray-600">N° Parc: {item.parkNumber}</p>
-                        </div>
-                        <Badge variant="outline" className="border-blue-300 text-blue-700">
-                          Attribué le {new Date(item.assignDate).toLocaleDateString('fr-FR')}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                    <Users className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                    <p>Aucun équipement attribué</p>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </p>
+                  <p className="text-sm text-muted-foreground">{employee.email}</p>
+                </div>
+                {employee.phone && (
+                  <div>
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      Téléphone
+                    </p>
+                    <p className="text-sm text-muted-foreground">{employee.phone}</p>
                   </div>
                 )}
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Date d'embauche
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(employee.hire_date).toLocaleDateString('fr-FR')}
+                  </p>
+                </div>
               </div>
+              {hasPermission('admin') && (
+                <div className="flex gap-2 mt-4">
+                  <Button variant="outline" size="sm" onClick={() => openEditDialog(employee)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Modifier
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleDelete(employee.id)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Supprimer
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
-
-      {filteredEmployees.length === 0 && (
-        <Card className="shadow-lg">
-          <CardContent className="text-center py-8">
-            <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-lg font-medium">Aucun employé trouvé</p>
-            <p className="text-muted-foreground">
-              {searchTerm ? 'Aucun employé ne correspond à votre recherche.' : 'Commencez par ajouter des employés.'}
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
