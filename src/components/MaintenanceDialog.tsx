@@ -23,7 +23,7 @@ const maintenanceSchema = z.object({
   technician: z.string().min(1, 'Le technicien est requis'),
   startDate: z.date(),
   endDate: z.date().optional(),
-  status: z.enum(['en_cours', 'terminee', 'en_retard']),
+  status: z.enum(['scheduled', 'in_progress', 'completed']),
   parkNumber: z.string().optional(),
   serialNumber: z.string().optional(),
 });
@@ -62,7 +62,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
       technician: initialData?.technician || '',
       startDate: initialData?.startDate ? new Date(initialData.startDate) : new Date(),
       endDate: initialData?.endDate ? new Date(initialData.endDate) : undefined,
-      status: initialData?.status || 'en_cours',
+      status: initialData?.status || 'scheduled',
       parkNumber: initialData?.parkNumber || '',
       serialNumber: initialData?.serialNumber || '',
     }
@@ -84,6 +84,15 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
   const handleClose = () => {
     reset();
     onClose();
+  };
+
+  const getStatusLabel = (status: string) => {
+    const statusMap = {
+      'scheduled': 'Planifiée',
+      'in_progress': 'En cours',
+      'completed': 'Terminée'
+    };
+    return statusMap[status as keyof typeof statusMap] || status;
   };
 
   return (
@@ -238,14 +247,14 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
 
           <div>
             <Label>Statut</Label>
-            <Select onValueChange={(value) => setValue('status', value as any)} defaultValue={initialData?.status || 'en_cours'}>
+            <Select onValueChange={(value: 'scheduled' | 'in_progress' | 'completed') => setValue('status', value)} defaultValue={initialData?.status || 'scheduled'}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="en_cours">En cours</SelectItem>
-                <SelectItem value="terminee">Terminée</SelectItem>
-                <SelectItem value="en_retard">En retard</SelectItem>
+                <SelectItem value="scheduled">Planifiée</SelectItem>
+                <SelectItem value="in_progress">En cours</SelectItem>
+                <SelectItem value="completed">Terminée</SelectItem>
               </SelectContent>
             </Select>
           </div>
