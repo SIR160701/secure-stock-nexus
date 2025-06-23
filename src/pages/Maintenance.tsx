@@ -109,16 +109,6 @@ const Maintenance = () => {
   };
 
   const openEditDialog = (item: MaintenanceRecord) => {
-    const editData = {
-      id: item.id,
-      item: item.equipment_name,
-      category: 'Équipement',
-      problem: item.description,
-      technician: 'À assigner',
-      startDate: new Date(item.scheduled_date),
-      endDate: item.completed_date ? new Date(item.completed_date) : undefined,
-      status: item.status as 'scheduled' | 'in_progress' | 'completed',
-    };
     setEditingItem(item);
     setShowDialog(true);
   };

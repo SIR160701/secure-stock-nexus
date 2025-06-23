@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +25,7 @@ const Employees = () => {
     department: '',
     hire_date: '',
     salary: '',
-    status: 'active' as const,
+    status: 'active' as 'active' | 'inactive' | 'terminated',
   });
 
   const resetForm = () => {
@@ -57,7 +56,7 @@ const Employees = () => {
       department: employee.department,
       hire_date: employee.hire_date,
       salary: employee.salary?.toString() || '',
-      status: employee.status,
+      status: employee.status as 'active' | 'inactive' | 'terminated',
     });
     setDialogOpen(true);
   };
@@ -148,7 +147,7 @@ const Employees = () => {
                   </div>
                   <div>
                     <Label htmlFor="status">Statut</Label>
-                    <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value as any })}>
+                    <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'terminated') => setFormData({ ...formData, status: value })}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
