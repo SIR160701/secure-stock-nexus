@@ -27,11 +27,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     first_name: '',
     last_name: '',
     department: '',
-    email: '',
-    employee_number: '',
-    position: '',
-    hire_date: new Date().toISOString().split('T')[0],
-    status: 'active' as 'active' | 'inactive' | 'terminated',
   });
 
   const [equipments, setEquipments] = useState<EquipmentAssignmentForm[]>([
@@ -47,11 +42,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         first_name: employee.first_name || '',
         last_name: employee.last_name || '',
         department: employee.department || '',
-        email: employee.email || '',
-        employee_number: employee.employee_number || '',
-        position: employee.position || '',
-        hire_date: employee.hire_date || new Date().toISOString().split('T')[0],
-        status: employee.status || 'active',
       });
     } else {
       resetForm();
@@ -63,11 +53,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
       first_name: '',
       last_name: '',
       department: '',
-      email: '',
-      employee_number: `EMP-${Date.now()}`,
-      position: '',
-      hire_date: new Date().toISOString().split('T')[0],
-      status: 'active',
     });
     setEquipments([
       { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
@@ -101,18 +86,29 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     try {
       let employeeId: string;
 
+      // Données pour l'employé
+      const employeeData = {
+        ...formData,
+        email: `${formData.first_name.toLowerCase()}.${formData.last_name.toLowerCase()}@entreprise.com`,
+        employee_number: `EMP-${Date.now()}`,
+        position: 'Employé',
+        hire_date: new Date().toISOString().split('T')[0],
+        status: 'active' as 'active' | 'inactive' | 'terminated',
+        phone: '',
+      };
+
       if (employee) {
         await updateEmployee.mutateAsync({
           id: employee.id,
-          ...formData,
+          ...employeeData,
         });
         employeeId = employee.id;
       } else {
-        const newEmployee = await createEmployee.mutateAsync(formData);
+        const newEmployee = await createEmployee.mutateAsync(employeeData);
         employeeId = newEmployee.id;
       }
 
-      // Créer les attributions d'équipements
+      // Créer les attributions d'équipements pour les équipements non-vides
       for (const equipment of equipments) {
         if (equipment.equipment_name.trim()) {
           await createAssignment.mutateAsync({
@@ -144,15 +140,16 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         <DialogHeader>
           <DialogTitle>{employee ? 'Modifier l\'employé' : 'Nouvel employé'}</DialogTitle>
           <DialogDescription>
-            {employee ? 'Modifier les informations de l\'employé.' : 'Ajouter un nouvel employé.'}
+            {employee ? 'Modifier les informations de l\'employé.' : 'Ajouter un nouvel employé avec ses équipements.'}
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
+            {/* Informations de l'employé */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="first_name">Prénom</Label>
+                <Label htmlFor="first_name">Prénom *</Label>
                 <Input
                   id="first_name"
                   value={formData.first_name}
@@ -161,7 +158,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                 />
               </div>
               <div>
-                <Label htmlFor="last_name">Nom</Label>
+                <Label htmlFor="last_name">Nom *</Label>
                 <Input
                   id="last_name"
                   value={formData.last_name}
@@ -172,21 +169,23 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
             </div>
             
             <div>
-              <Label htmlFor="department">Département</Label>
+              <Label htmlFor="department">Département *</Label>
               <Input
                 id="department"
                 value={formData.department}
                 onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                placeholder="Ex: Informatique, RH, Comptabilité..."
                 required
               />
             </div>
 
+            {/* Section équipements */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Équipements attribués</Label>
                 <Button type="button" onClick={addEquipment} size="sm" variant="outline">
                   <Plus className="h-4 w-4 mr-1" />
-                  Ajouter
+                  Ajouter un équipement
                 </Button>
               </div>
               
@@ -207,16 +206,17 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                       )}
                     </div>
                     
+                    <div>
+                      <Label htmlFor={`equipment_name_${index}`}>Modèle de l'équipement</Label>
+                      <Input
+                        id={`equipment_name_${index}`}
+                        value={equipment.equipment_name}
+                        onChange={(e) => updateEquipment(index, 'equipment_name', e.target.value)}
+                        placeholder="Ex: Laptop Dell Latitude 5520"
+                      />
+                    </div>
+                    
                     <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label htmlFor={`equipment_name_${index}`}>Modèle</Label>
-                        <Input
-                          id={`equipment_name_${index}`}
-                          value={equipment.equipment_name}
-                          onChange={(e) => updateEquipment(index, 'equipment_name', e.target.value)}
-                          placeholder="Ex: Laptop Dell"
-                        />
-                      </div>
                       <div>
                         <Label htmlFor={`park_number_${index}`}>N° de parc</Label>
                         <Input
@@ -226,9 +226,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                           placeholder="Ex: PC001"
                         />
                       </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label htmlFor={`serial_number_${index}`}>N° de série</Label>
                         <Input
@@ -238,15 +235,16 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                           placeholder="Ex: SN123456"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor={`assigned_date_${index}`}>Date d'attribution</Label>
-                        <Input
-                          id={`assigned_date_${index}`}
-                          type="date"
-                          value={equipment.assigned_date}
-                          onChange={(e) => updateEquipment(index, 'assigned_date', e.target.value)}
-                        />
-                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor={`assigned_date_${index}`}>Date d'attribution</Label>
+                      <Input
+                        id={`assigned_date_${index}`}
+                        type="date"
+                        value={equipment.assigned_date}
+                        onChange={(e) => updateEquipment(index, 'assigned_date', e.target.value)}
+                      />
                     </div>
                   </CardContent>
                 </Card>

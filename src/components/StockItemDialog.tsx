@@ -45,7 +45,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
       name: '',
       park_number: '',
       serial_number: '',
-      category: '',
+      category: categories[0]?.name || '',
       status: 'active',
     });
   };
@@ -55,13 +55,10 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
     
     try {
       const itemData = {
-        name: formData.name,
-        park_number: formData.park_number,
-        serial_number: formData.serial_number,
-        category: formData.category,
-        status: formData.status,
+        ...formData,
         sku: `SKU-${Date.now()}`,
         quantity: 1,
+        description: `Article: ${formData.name}`,
       };
 
       if (item) {
@@ -93,7 +90,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
         onClose();
       }
     }}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>{item ? 'Modifier l\'article' : 'Nouvel article'}</DialogTitle>
           <DialogDescription>
@@ -103,41 +100,45 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
         
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">Modèle</Label>
+            <div>
+              <Label htmlFor="name">Modèle de l'article *</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="col-span-3"
+                placeholder="Ex: Laptop Dell Latitude 5520"
                 required
               />
             </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="park_number" className="text-right">N° de parc</Label>
-              <Input
-                id="park_number"
-                value={formData.park_number}
-                onChange={(e) => setFormData({ ...formData, park_number: e.target.value })}
-                className="col-span-3"
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="park_number">Numéro de parc</Label>
+                <Input
+                  id="park_number"
+                  value={formData.park_number}
+                  onChange={(e) => setFormData({ ...formData, park_number: e.target.value })}
+                  placeholder="Ex: PC001"
+                />
+              </div>
+              <div>
+                <Label htmlFor="serial_number">Numéro de série</Label>
+                <Input
+                  id="serial_number"
+                  value={formData.serial_number}
+                  onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                  placeholder="Ex: SN123456"
+                />
+              </div>
             </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="serial_number" className="text-right">N° de série</Label>
-              <Input
-                id="serial_number"
-                value={formData.serial_number}
-                onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
-                className="col-span-3"
-              />
-            </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="category" className="text-right">Catégorie</Label>
-              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                <SelectTrigger className="col-span-3">
+
+            <div>
+              <Label htmlFor="category">Catégorie *</Label>
+              <Select 
+                value={formData.category} 
+                onValueChange={(value) => setFormData({ ...formData, category: value })}
+              >
+                <SelectTrigger>
                   <SelectValue placeholder="Sélectionner une catégorie" />
                 </SelectTrigger>
                 <SelectContent>
@@ -149,12 +150,17 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
                 </SelectContent>
               </Select>
             </div>
-            
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">Statut</Label>
-              <Select value={formData.status} onValueChange={(value: any) => setFormData({ ...formData, status: value })}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Sélectionner un statut" />
+
+            <div>
+              <Label htmlFor="status">Statut *</Label>
+              <Select 
+                value={formData.status} 
+                onValueChange={(value: 'active' | 'inactive' | 'discontinued') => 
+                  setFormData({ ...formData, status: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner le statut" />
                 </SelectTrigger>
                 <SelectContent>
                   {statusOptions.map((option) => (

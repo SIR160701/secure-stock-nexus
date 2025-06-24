@@ -1,41 +1,61 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useStockCategories } from '@/hooks/useStockCategories';
+import { useStockCategories, StockCategory } from '@/hooks/useStockCategories';
 
 interface CategoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  category?: StockCategory | null;
 }
 
-const CategoryDialog: React.FC<CategoryDialogProps> = ({ isOpen, onClose }) => {
-  const [name, setName] = useState('');
-  const [criticalThreshold, setCriticalThreshold] = useState('10');
-  const { createCategory } = useStockCategories();
+const CategoryDialog: React.FC<CategoryDialogProps> = ({ isOpen, onClose, category }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    critical_threshold: 10,
+  });
+
+  const { createCategory, updateCategory } = useStockCategories();
+
+  useEffect(() => {
+    if (category) {
+      setFormData({
+        name: category.name || '',
+        critical_threshold: category.critical_threshold || 10,
+      });
+    } else {
+      resetForm();
+    }
+  }, [category, isOpen]);
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      critical_threshold: 10,
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      await createCategory.mutateAsync({
-        name,
-        critical_threshold: parseInt(criticalThreshold),
-      });
+      if (category) {
+        await updateCategory.mutateAsync({
+          id: category.id,
+          ...formData,
+        });
+      } else {
+        await createCategory.mutateAsync(formData);
+      }
       
-      setName('');
-      setCriticalThreshold('10');
+      resetForm();
       onClose();
     } catch (error) {
-      console.error('Erreur lors de la création de la catégorie:', error);
+      console.error('Erreur lors de la sauvegarde:', error);
     }
-  };
-
-  const resetForm = () => {
-    setName('');
-    setCriticalThreshold('10');
   };
 
   return (
@@ -45,41 +65,41 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({ isOpen, onClose }) => {
         onClose();
       }
     }}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>Nouvelle catégorie</DialogTitle>
+          <DialogTitle>{category ? 'Modifier la catégorie' : 'Nouvelle catégorie'}</DialogTitle>
           <DialogDescription>
-            Créer une nouvelle catégorie pour organiser votre stock.
+            {category ? 'Modifier les informations de la catégorie.' : 'Créer une nouvelle catégorie pour organiser vos articles.'}
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Nom
-              </Label>
+            <div>
+              <Label htmlFor="name">Nom de la catégorie *</Label>
               <Input
                 id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="col-span-3"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Ex: Informatique, Mobilier, Électronique..."
                 required
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="threshold" className="text-right">
-                Seuil critique
-              </Label>
+
+            <div>
+              <Label htmlFor="critical_threshold">Seuil critique *</Label>
               <Input
-                id="threshold"
+                id="critical_threshold"
                 type="number"
-                value={criticalThreshold}
-                onChange={(e) => setCriticalThreshold(e.target.value)}
-                className="col-span-3"
                 min="1"
+                value={formData.critical_threshold}
+                onChange={(e) => setFormData({ ...formData, critical_threshold: parseInt(e.target.value) || 10 })}
+                placeholder="Ex: 5"
                 required
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Nombre minimum d'articles avant alerte critique
+              </p>
             </div>
           </div>
           
@@ -90,8 +110,8 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({ isOpen, onClose }) => {
             }}>
               Annuler
             </Button>
-            <Button type="submit" disabled={createCategory.isPending}>
-              {createCategory.isPending ? 'Création...' : 'Créer'}
+            <Button type="submit" disabled={createCategory.isPending || updateCategory.isPending}>
+              {category ? 'Modifier' : 'Créer'}
             </Button>
           </DialogFooter>
         </form>
