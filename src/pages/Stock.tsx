@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Package, Plus, Edit, Trash2, AlertTriangle, Hash } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Search, Settings } from 'lucide-react';
 import { useStock, StockItem } from '@/hooks/useStock';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -16,6 +16,8 @@ const Stock = () => {
   const { hasPermission } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -30,6 +32,27 @@ const Stock = () => {
     serial_number: '',
     status: 'active' as 'active' | 'inactive' | 'discontinued',
   });
+
+  // Get unique categories
+  const categories = [...new Set(stockItems.map(item => item.category))];
+  
+  // Filter items
+  const filteredItems = stockItems.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (item.park_number && item.park_number.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  // Group items by category
+  const groupedItems = categories.reduce((acc, category) => {
+    const categoryItems = filteredItems.filter(item => item.category === category);
+    if (categoryItems.length > 0) {
+      acc[category] = categoryItems;
+    }
+    return acc;
+  }, {} as Record<string, StockItem[]>);
 
   const resetForm = () => {
     setFormData({
@@ -96,20 +119,27 @@ const Stock = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      active: { label: 'Actif', className: 'bg-green-100 text-green-800' },
-      inactive: { label: 'Inactif', className: 'bg-yellow-100 text-yellow-800' },
-      discontinued: { label: 'Discontinué', className: 'bg-red-100 text-red-800' }
+      'Disponible': { className: 'bg-green-100 text-green-700 border-green-200' },
+      'Alloué': { className: 'bg-blue-100 text-blue-700 border-blue-200' },
+      'Maintenance': { className: 'bg-red-100 text-red-700 border-red-200' }
     };
     
     return (
-      <Badge className={statusConfig[status as keyof typeof statusConfig].className}>
-        {statusConfig[status as keyof typeof statusConfig].label}
+      <Badge className={statusConfig[status as keyof typeof statusConfig]?.className || 'bg-gray-100 text-gray-700'}>
+        {status}
       </Badge>
     );
   };
 
   const isLowStock = (item: StockItem) => {
     return item.minimum_quantity && item.quantity <= item.minimum_quantity;
+  };
+
+  const getStockStatus = (item: StockItem) => {
+    if (isLowStock(item)) return 'Critique';
+    if (item.status === 'active') return 'Disponible';
+    if (item.status === 'inactive') return 'Alloué';
+    return 'Maintenance';
   };
 
   if (isLoading) {
@@ -127,230 +157,271 @@ const Stock = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Stock</h1>
-          <p className="text-gray-600 mt-2">Gestion des articles en stock</p>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-8 text-white">
+        <div className="flex items-center space-x-3 mb-4">
+          <Package className="h-8 w-8" />
+          <div>
+            <h1 className="text-3xl font-bold">Gestion du Stock</h1>
+            <p className="text-purple-100">Gérez vos articles et catégories avec efficacité</p>
+          </div>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
-              Ajouter un article
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingItem ? 'Modifier' : 'Ajouter'} un article</DialogTitle>
-              <DialogDescription>
-                {editingItem ? 'Modifiez' : 'Ajoutez'} les informations de l'article.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label htmlFor="name">Nom de l'article</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="sku">SKU</Label>
-                  <Input
-                    id="sku"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="category">Catégorie</Label>
-                  <Input
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="quantity">Quantité</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="minimum_quantity">Quantité minimale</Label>
-                  <Input
-                    id="minimum_quantity"
-                    type="number"
-                    value={formData.minimum_quantity}
-                    onChange={(e) => setFormData({ ...formData, minimum_quantity: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="unit_price">Prix unitaire (€)</Label>
-                  <Input
-                    id="unit_price"
-                    type="number"
-                    step="0.01"
-                    value={formData.unit_price}
-                    onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="supplier">Fournisseur</Label>
-                  <Input
-                    id="supplier"
-                    value={formData.supplier}
-                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="location">Emplacement</Label>
-                  <Input
-                    id="location"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="park_number">Numéro de parc</Label>
-                  <Input
-                    id="park_number"
-                    value={formData.park_number}
-                    onChange={(e) => setFormData({ ...formData, park_number: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="serial_number">Numéro de série</Label>
-                  <Input
-                    id="serial_number"
-                    value={formData.serial_number}
-                    onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="status">Statut</Label>
-                  <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'discontinued') => setFormData({ ...formData, status: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Actif</SelectItem>
-                      <SelectItem value="inactive">Inactif</SelectItem>
-                      <SelectItem value="discontinued">Discontinué</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                  Annuler
-                </Button>
-                <Button type="submit">
-                  {editingItem ? 'Modifier' : 'Ajouter'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
       </div>
 
-      <div className="grid gap-4">
-        {stockItems.map((item) => (
-          <Card key={item.id} className={`shadow-lg ${isLowStock(item) ? 'border-orange-200 bg-orange-50' : ''}`}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    {item.name}
-                    {item.park_number && (
-                      <Badge variant="outline" className="text-xs">
-                        {item.park_number}
-                      </Badge>
-                    )}
-                    {isLowStock(item) && (
-                      <Badge className="bg-orange-100 text-orange-800">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        Stock bas
-                      </Badge>
-                    )}
-                  </CardTitle>
-                  <CardDescription>{item.category} - SKU: {item.sku}</CardDescription>
-                  {item.description && (
-                    <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
-                  )}
+      {/* Search and Actions */}
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="flex items-center space-x-4 flex-1">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Input
+              placeholder="Rechercher un article..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Toutes catégories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes catégories</SelectItem>
+              {categories.map(category => (
+                <SelectItem key={category} value={category}>{category}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex space-x-2">
+          <Button variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Nouvelle catégorie
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nouvel article
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingItem ? 'Modifier' : 'Ajouter'} un article</DialogTitle>
+                <DialogDescription>
+                  {editingItem ? 'Modifiez' : 'Ajoutez'} les informations de l'article.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  
+                  <div className="col-span-2">
+                    <Label htmlFor="name">Nom de l'article</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="sku">SKU</Label>
+                    <Input
+                      id="sku"
+                      value={formData.sku}
+                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="category">Catégorie</Label>
+                    <Input
+                      id="category"
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="quantity">Quantité</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="minimum_quantity">Quantité minimale</Label>
+                    <Input
+                      id="minimum_quantity"
+                      type="number"
+                      value={formData.minimum_quantity}
+                      onChange={(e) => setFormData({ ...formData, minimum_quantity: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="unit_price">Prix unitaire (€)</Label>
+                    <Input
+                      id="unit_price"
+                      type="number"
+                      step="0.01"
+                      value={formData.unit_price}
+                      onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="supplier">Fournisseur</Label>
+                    <Input
+                      id="supplier"
+                      value={formData.supplier}
+                      onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="location">Emplacement</Label>
+                    <Input
+                      id="location"
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="park_number">N° Parc</Label>
+                    <Input
+                      id="park_number"
+                      value={formData.park_number}
+                      onChange={(e) => setFormData({ ...formData, park_number: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="serial_number">N° Série</Label>
+                    <Input
+                      id="serial_number"
+                      value={formData.serial_number}
+                      onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="status">Statut</Label>
+                    <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'discontinued') => setFormData({ ...formData, status: value })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Actif</SelectItem>
+                        <SelectItem value="inactive">Inactif</SelectItem>
+                        <SelectItem value="discontinued">Discontinué</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                {getStatusBadge(item.status)}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Quantité</p>
-                  <p className="text-lg font-bold">{item.quantity}</p>
-                  {item.minimum_quantity && (
-                    <p className="text-xs text-muted-foreground">Min: {item.minimum_quantity}</p>
-                  )}
-                </div>
-                {item.unit_price && (
-                  <div>
-                    <p className="text-sm font-medium">Prix unitaire</p>
-                    <p className="text-sm text-muted-foreground">{item.unit_price}€</p>
-                  </div>
-                )}
-                {item.location && (
-                  <div>
-                    <p className="text-sm font-medium">Emplacement</p>
-                    <p className="text-sm text-muted-foreground">{item.location}</p>
-                  </div>
-                )}
-                {item.serial_number && (
-                  <div>
-                    <p className="text-sm font-medium flex items-center gap-1">
-                      <Hash className="h-3 w-3" />
-                      N° Série
-                    </p>
-                    <p className="text-sm text-muted-foreground">{item.serial_number}</p>
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-2 mt-4">
-                <Button variant="outline" size="sm" onClick={() => openEditDialog(item)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Modifier
-                </Button>
-                {hasPermission('admin') && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleDelete(item.id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Supprimer
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                    Annuler
                   </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  <Button type="submit">
+                    {editingItem ? 'Modifier' : 'Ajouter'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Categories and Items */}
+      <div className="space-y-6">
+        {Object.entries(groupedItems).map(([category, items]) => {
+          const totalItems = items.length;
+          const criticalItems = items.filter(item => isLowStock(item)).length;
+          const availableItems = items.filter(item => item.status === 'active' && !isLowStock(item)).length;
+          
+          return (
+            <Card key={category} className="border-0 shadow-lg overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Package className="h-6 w-6 text-gray-600" />
+                    <div>
+                      <CardTitle className="text-xl font-bold text-gray-900">{category}</CardTitle>
+                      <CardDescription>
+                        {totalItems} articles au total - {availableItems} disponibles (Seuil: {items.find(i => i.minimum_quantity)?.minimum_quantity || 10})
+                      </CardDescription>
+                    </div>
+                    {criticalItems > 0 && (
+                      <Badge className="bg-red-100 text-red-700 border-red-200">
+                        Critique
+                      </Badge>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="sm">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Modifier seuil
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Modèle</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">N° Parc</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">N° Série</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {items.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.park_number || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {item.serial_number || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getStatusBadge(getStockStatus(item))}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <Button variant="ghost" size="sm" onClick={() => openEditDialog(item)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              {hasPermission('admin') && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleDelete(item.id)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

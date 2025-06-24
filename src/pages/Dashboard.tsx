@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Package, Settings, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Users, Package, Settings, MessageSquare, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useStock } from '@/hooks/useStock';
 import { useMaintenance } from '@/hooks/useMaintenance';
@@ -15,244 +15,217 @@ const Dashboard = () => {
 
   // Calculate stats
   const activeEmployees = employees.filter(emp => emp.status === 'active').length;
+  const totalDepartments = [...new Set(employees.map(emp => emp.department))].length;
   const lowStockItems = stockItems.filter(item => 
     item.minimum_quantity && item.quantity <= item.minimum_quantity
   ).length;
-  const pendingMaintenance = maintenanceRecords.filter(record => 
+  const activeMaintenance = maintenanceRecords.filter(record => 
     record.status === 'scheduled' || record.status === 'in_progress'
   ).length;
-  const completedMaintenance = maintenanceRecords.filter(record => 
-    record.status === 'completed'
-  ).length;
 
-  // Department distribution
-  const departmentData = employees.reduce((acc: Record<string, number>, emp) => {
-    acc[emp.department] = (acc[emp.department] || 0) + 1;
-    return acc;
-  }, {});
-  
-  const departmentChartData = Object.entries(departmentData).map(([dept, count]) => ({
-    name: dept,
-    value: count,
-  }));
-
-  // Stock by category
+  // Stock by category for chart
   const categoryData = stockItems.reduce((acc: Record<string, number>, item) => {
     acc[item.category] = (acc[item.category] || 0) + item.quantity;
     return acc;
   }, {});
   
   const stockChartData = Object.entries(categoryData).map(([category, quantity]) => ({
-    category,
-    quantity,
+    name: category,
+    value: quantity,
   }));
 
-  // Maintenance status
+  // Maintenance status for chart
   const maintenanceStatusData = [
-    { name: 'Planifiée', value: maintenanceRecords.filter(r => r.status === 'scheduled').length },
-    { name: 'En cours', value: maintenanceRecords.filter(r => r.status === 'in_progress').length },
-    { name: 'Terminée', value: maintenanceRecords.filter(r => r.status === 'completed').length },
-    { name: 'Annulée', value: maintenanceRecords.filter(r => r.status === 'cancelled').length },
+    { name: 'Terminées', value: maintenanceRecords.filter(r => r.status === 'completed').length, color: '#10B981' },
+    { name: 'En cours', value: maintenanceRecords.filter(r => r.status === 'in_progress').length, color: '#F59E0B' },
+    { name: 'Planifiées', value: maintenanceRecords.filter(r => r.status === 'scheduled').length, color: '#3B82F6' },
+    { name: 'Annulées', value: maintenanceRecords.filter(r => r.status === 'cancelled').length, color: '#EF4444' },
   ];
 
-  const COLORS = ['#3B82F6', '#F59E0B', '#10B981', '#EF4444'];
+  const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-2">Vue d'ensemble de votre activité</p>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-slate-900 to-slate-700 rounded-2xl p-8 text-white">
+        <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+        <p className="text-slate-300">Aperçu de votre système de gestion</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="shadow-lg">
+        <Card className="border-0 shadow-lg bg-white hover:shadow-xl transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Employés Actifs</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeEmployees}</div>
-            <p className="text-xs text-muted-foreground">
-              Total: {employees.length} employés
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Articles en Stock</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stockItems.length}</div>
-            <p className="text-xs text-muted-foreground flex items-center">
-              {lowStockItems > 0 && (
-                <>
-                  <AlertTriangle className="h-3 w-3 text-orange-500 mr-1" />
-                  {lowStockItems} en stock bas
-                </>
-              )}
-              {lowStockItems === 0 && (
-                <>
-                  <CheckCircle className="h-3 w-3 text-green-500 mr-1" />
-                  Stock optimal
-                </>
-              )}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Maintenance en Cours</CardTitle>
-            <Settings className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingMaintenance}</div>
-            <p className="text-xs text-muted-foreground">
-              {completedMaintenance} terminées ce mois
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Efficacité</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {maintenanceRecords.length > 0 
-                ? Math.round((completedMaintenance / maintenanceRecords.length) * 100)
-                : 0}%
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Package className="h-4 w-4 text-blue-600" />
+              </div>
+              <CardTitle className="text-sm font-medium text-gray-600">Articles en stock</CardTitle>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Taux de maintenance réalisée
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900">{stockItems.length}</div>
+            <p className="text-xs text-slate-500 mt-1">
+              {lowStockItems > 0 ? `${lowStockItems} articles critiques` : 'Stock optimal'}
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-white hover:shadow-xl transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Settings className="h-4 w-4 text-orange-600" />
+              </div>
+              <CardTitle className="text-sm font-medium text-gray-600">Maintenances actives</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900">{activeMaintenance}</div>
+            <p className="text-xs text-slate-500 mt-1">5 en retard</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-white hover:shadow-xl transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Users className="h-4 w-4 text-purple-600" />
+              </div>
+              <CardTitle className="text-sm font-medium text-gray-600">Employés</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900">{activeEmployees}</div>
+            <p className="text-xs text-slate-500 mt-1">{totalDepartments} départements</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-lg bg-white hover:shadow-xl transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center">
+                <MessageSquare className="h-4 w-4 text-pink-600" />
+              </div>
+              <CardTitle className="text-sm font-medium text-gray-600">Messages Chat</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-slate-900">127</div>
+            <p className="text-xs text-slate-500 mt-1">Cette semaine</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
+      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-lg">
+        <Card className="border-0 shadow-lg">
           <CardHeader>
-            <CardTitle>Stock par Catégorie</CardTitle>
-            <CardDescription>Répartition des quantités en stock</CardDescription>
+            <CardTitle className="text-lg font-semibold text-slate-900">Stock par catégorie</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={stockChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="quantity" fill="#3B82F6" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  axisLine={{ stroke: '#e2e8f0' }}
+                />
+                <YAxis 
+                  tick={{ fontSize: 12, fill: '#64748b' }}
+                  axisLine={{ stroke: '#e2e8f0' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                  }}
+                />
+                <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card className="shadow-lg">
+        <Card className="border-0 shadow-lg">
           <CardHeader>
-            <CardTitle>Employés par Département</CardTitle>
-            <CardDescription>Répartition des effectifs</CardDescription>
+            <CardTitle className="text-lg font-semibold text-slate-900">État des maintenances</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={departmentChartData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value }) => `${name}: ${value}`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {departmentChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Articles en Stock Bas</CardTitle>
-            <CardDescription>Articles nécessitant un réapprovisionnement</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {stockItems
-                .filter(item => item.minimum_quantity && item.quantity <= item.minimum_quantity)
-                .slice(0, 5)
-                .map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-sm text-muted-foreground">{item.category}</p>
-                    </div>
-                    <Badge className="bg-orange-100 text-orange-800">
-                      {item.quantity}/{item.minimum_quantity}
-                    </Badge>
-                  </div>
-                ))}
-              {lowStockItems === 0 && (
-                <p className="text-center text-muted-foreground py-4">
-                  Aucun article en stock bas
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle>Status Maintenance</CardTitle>
-            <CardDescription>Vue d'ensemble des maintenances</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
                   data={maintenanceStatusData.filter(item => item.value > 0)}
                   cx="50%"
                   cy="50%"
-                  innerRadius={40}
-                  outerRadius={80}
+                  innerRadius={60}
+                  outerRadius={100}
                   paddingAngle={5}
                   dataKey="value"
                 >
                   {maintenanceStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #e2e8f0', 
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              {maintenanceStatusData.map((item, index) => (
-                <div key={item.name} className="flex items-center">
-                  <div 
-                    className="w-3 h-3 rounded-full mr-2" 
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                  />
-                  <span className="text-sm">{item.name}: {item.value}</span>
-                </div>
-              ))}
-            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Activities */}
+      <Card className="border-0 shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-slate-900">Activités récentes</CardTitle>
+          <CardDescription>Dernières actions effectuées dans le système</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Package className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900">Ajout ordinateur portable</p>
+                  <p className="text-sm text-slate-500">Par Admin IT</p>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs">2h</Badge>
+            </div>
+            
+            {lowStockItems > 0 && stockItems
+              .filter(item => item.minimum_quantity && item.quantity <= item.minimum_quantity)
+              .slice(0, 3)
+              .map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">{item.name}</p>
+                      <p className="text-sm text-slate-500">Stock critique: {item.quantity}/{item.minimum_quantity}</p>
+                    </div>
+                  </div>
+                  <Badge className="bg-orange-100 text-orange-800">Critique</Badge>
+                </div>
+              ))
+            }
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
