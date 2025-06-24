@@ -7,7 +7,7 @@ export interface EquipmentAssignment {
   id: string;
   employee_id: string;
   equipment_name: string;
-  park_number?: string;
+  park_number: string;
   serial_number?: string;
   assigned_date: string;
   status: 'assigned' | 'returned';

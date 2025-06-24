@@ -31,7 +31,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     employee_number: '',
     position: '',
     hire_date: new Date().toISOString().split('T')[0],
-    status: 'active' as const,
+    status: 'active' as 'active' | 'inactive' | 'terminated',
   });
 
   const [equipments, setEquipments] = useState<EquipmentAssignmentForm[]>([
@@ -39,7 +39,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
   ]);
 
   const { createEmployee, updateEmployee } = useEmployees();
-  const { createAssignment, updateAssignment } = useEquipmentAssignments();
+  const { createAssignment } = useEquipmentAssignments();
 
   useEffect(() => {
     if (employee) {
@@ -118,8 +118,8 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
           await createAssignment.mutateAsync({
             employee_id: employeeId,
             equipment_name: equipment.equipment_name,
-            park_number: equipment.park_number || undefined,
-            serial_number: equipment.serial_number || undefined,
+            park_number: equipment.park_number || '',
+            serial_number: equipment.serial_number || '',
             assigned_date: equipment.assigned_date,
             status: 'assigned',
           });
