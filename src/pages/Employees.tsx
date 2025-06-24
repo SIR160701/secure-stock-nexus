@@ -1,411 +1,317 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Plus, Edit, Trash2, Search, User } from 'lucide-react';
-import { useEmployees, Employee } from '@/hooks/useEmployees';
-import { useAuth } from '@/contexts/AuthContext';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, Search, Edit, Trash2, Users, Building, UserCheck, Calendar } from 'lucide-react';
+import { useEmployees } from '@/hooks/useEmployees';
+import { useEquipmentAssignments } from '@/hooks/useEquipmentAssignments';
+import EmployeeDialog from '@/components/EmployeeDialog';
 
 const Employees = () => {
-  const { employees, isLoading, createEmployee, updateEmployee, deleteEmployee } = useEmployees();
-  const { hasPermission } = useAuth();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [formData, setFormData] = useState({
-    employee_number: '',
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    position: '',
-    department: '',
-    hire_date: '',
-    salary: '',
-    status: 'active' as 'active' | 'inactive' | 'terminated',
-  });
+  const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  // Get department statistics
-  const departmentStats = employees.reduce((acc, emp) => {
-    acc[emp.department] = (acc[emp.department] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const { employees, deleteEmployee } = useEmployees();
+  const { assignments } = useEquipmentAssignments();
 
-  const totalEmployees = employees.length;
-  const totalDepartments = Object.keys(departmentStats).length;
-  const totalEquipments = 4; // This would come from equipment assignments
+  // Calculate stats
+  const activeEmployees = employees.filter(emp => emp.status === 'active').length;
+  const departments = [...new Set(employees.map(emp => emp.department))];
+  const totalAssignments = assignments.filter(a => a.status === 'assigned').length;
 
   // Filter employees
-  const filteredEmployees = employees.filter(emp => 
-    emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEmployees = employees.filter(emp => {
+    const matchesSearch = 
+      emp.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.employee_number.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDepartment = selectedDepartment === 'all' || emp.department === selectedDepartment;
+    return matchesSearch && matchesDepartment;
+  });
 
-  const resetForm = () => {
-    setFormData({
-      employee_number: '',
-      first_name: '',
-      last_name: '',
-      email: '',
-      phone: '',
-      position: '',
-      department: '',
-      hire_date: '',
-      salary: '',
-      status: 'active',
-    });
-    setEditingEmployee(null);
-  };
-
-  const openEditDialog = (employee: Employee) => {
-    setEditingEmployee(employee);
-    setFormData({
-      employee_number: employee.employee_number,
-      first_name: employee.first_name,
-      last_name: employee.last_name,
-      email: employee.email,
-      phone: employee.phone || '',
-      position: employee.position,
-      department: employee.department,
-      hire_date: employee.hire_date,
-      salary: employee.salary?.toString() || '',
-      status: employee.status as 'active' | 'inactive' | 'terminated',
-    });
-    setDialogOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Department stats
+  const departmentStats = departments.map(dept => {
+    const deptEmployees = employees.filter(emp => emp.department === dept && emp.status === 'active');
+    const deptAssignments = assignments.filter(a => 
+      a.status === 'assigned' && 
+      deptEmployees.some(emp => emp.id === a.employee_id)
+    ).length;
     
-    const employeeData = {
-      ...formData,
-      salary: formData.salary ? parseFloat(formData.salary) : undefined,
+    return {
+      name: dept,
+      count: deptEmployees.length,
+      assignments: deptAssignments
     };
+  });
 
-    if (editingEmployee) {
-      await updateEmployee.mutateAsync({ id: editingEmployee.id, ...employeeData });
-    } else {
-      await createEmployee.mutateAsync(employeeData);
-    }
-    
-    setDialogOpen(false);
-    resetForm();
+  const handleEdit = (employee) => {
+    setSelectedEmployee(employee);
+    setShowEmployeeDialog(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer cet employé ?')) {
+  const handleDelete = async (id) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet employé ?')) {
       await deleteEmployee.mutateAsync(id);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg animate-pulse">
-            <Users className="h-8 w-8 text-white" />
-          </div>
-          <p className="text-gray-600">Chargement des employés...</p>
-        </div>
-      </div>
-    );
-  }
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-100 text-green-800">Actif</Badge>;
+      case 'inactive':
+        return <Badge className="bg-gray-100 text-gray-800">Inactif</Badge>;
+      case 'terminated':
+        return <Badge className="bg-red-100 text-red-800">Terminé</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  const getEmployeeAssignments = (employeeId) => {
+    return assignments.filter(a => a.employee_id === employeeId && a.status === 'assigned');
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-8 text-white">
-        <div className="flex items-center space-x-3 mb-4">
-          <Users className="h-8 w-8" />
-          <div>
-            <h1 className="text-3xl font-bold">Gestion des Employés</h1>
-            <p className="text-purple-100">Gérez les employés et leurs équipements attribués</p>
-          </div>
-        </div>
+      <div className="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-2xl p-8 text-white">
+        <h1 className="text-3xl font-bold mb-2">Gestion des Employés</h1>
+        <p className="text-purple-100">Gérez vos employés et leurs attributions d'équipements</p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="border-0 shadow-lg bg-white">
-          <CardHeader className="pb-2">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Users className="h-4 w-4 text-purple-600" />
-              </div>
-              <CardTitle className="text-sm font-medium text-gray-600">Total Employés</CardTitle>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Employés actifs</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-purple-600">{totalEmployees}</div>
+            <div className="text-2xl font-bold">{activeEmployees}</div>
+            <p className="text-xs text-muted-foreground">
+              sur {employees.length} total
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-lg bg-white">
-          <CardHeader className="pb-2">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Users className="h-4 w-4 text-blue-600" />
-              </div>
-              <CardTitle className="text-sm font-medium text-gray-600">Départements</CardTitle>
-            </div>
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Départements</CardTitle>
+            <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-600">{totalDepartments}</div>
+            <div className="text-2xl font-bold">{departments.length}</div>
+            <p className="text-xs text-muted-foreground">
+              départements actifs
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-lg bg-white">
-          <CardHeader className="pb-2">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                <Users className="h-4 w-4 text-green-600" />
-              </div>
-              <CardTitle className="text-sm font-medium text-gray-600">Équipements Attribués</CardTitle>
-            </div>
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Équipements attribués</CardTitle>
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">{totalEquipments}</div>
+            <div className="text-2xl font-bold">{totalAssignments}</div>
+            <p className="text-xs text-muted-foreground">
+              équipements en cours
+            </p>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Search and Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Rechercher un employé..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        {hasPermission('admin') && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm} className="bg-purple-600 hover:bg-purple-700">
-                <Plus className="h-4 w-4 mr-2" />
-                Nouvel employé
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>{editingEmployee ? 'Modifier' : 'Ajouter'} un employé</DialogTitle>
-                <DialogDescription>
-                  {editingEmployee ? 'Modifiez' : 'Ajoutez'} les informations de l'employé.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="employee_number">Numéro d'employé</Label>
-                    <Input
-                      id="employee_number"
-                      value={formData.employee_number}
-                      onChange={(e) => setFormData({ ...formData, employee_number: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="status">Statut</Label>
-                    <Select value={formData.status} onValueChange={(value: 'active' | 'inactive' | 'terminated') => setFormData({ ...formData, status: value })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Actif</SelectItem>
-                        <SelectItem value="inactive">Inactif</SelectItem>
-                        <SelectItem value="terminated">Licencié</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="first_name">Prénom</Label>
-                    <Input
-                      id="first_name"
-                      value={formData.first_name}
-                      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="last_name">Nom</Label>
-                    <Input
-                      id="last_name"
-                      value={formData.last_name}
-                      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Téléphone</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="position">Poste</Label>
-                    <Input
-                      id="position"
-                      value={formData.position}
-                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="department">Département</Label>
-                    <Input
-                      id="department"
-                      value={formData.department}
-                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="hire_date">Date d'embauche</Label>
-                    <Input
-                      id="hire_date"
-                      type="date"
-                      value={formData.hire_date}
-                      onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="salary">Salaire</Label>
-                    <Input
-                      id="salary"
-                      type="number"
-                      value={formData.salary}
-                      onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                    Annuler
-                  </Button>
-                  <Button type="submit">
-                    {editingEmployee ? 'Modifier' : 'Ajouter'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Nouvelles embauches</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {employees.filter(emp => {
+                const hireDate = new Date(emp.hire_date);
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                return hireDate >= thirtyDaysAgo;
+              }).length}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              ce mois-ci
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Department Distribution */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
-          <div className="flex items-center space-x-2">
-            <Users className="h-5 w-5 text-purple-600" />
-            <CardTitle className="text-lg font-semibold">Répartition par département</CardTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Répartition par département</CardTitle>
+              <CardDescription>Vue d'ensemble des employés et équipements par département</CardDescription>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(departmentStats).map(([dept, count]) => (
-              <Badge key={dept} variant="outline" className="px-3 py-1">
-                {dept}: {count} employé{count > 1 ? 's' : ''}
-              </Badge>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <Card 
+              className={`cursor-pointer transition-all hover:shadow-md ${
+                selectedDepartment === 'all' ? 'ring-2 ring-purple-500 bg-purple-50' : ''
+              }`}
+              onClick={() => setSelectedDepartment('all')}
+            >
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-gray-900">{activeEmployees}</div>
+                <div className="text-sm text-gray-500">Tous départements</div>
+                <div className="text-xs text-gray-400 mt-1">{totalAssignments} équipements</div>
+              </CardContent>
+            </Card>
+            
+            {departmentStats.map((dept) => (
+              <Card 
+                key={dept.name}
+                className={`cursor-pointer transition-all hover:shadow-md ${
+                  selectedDepartment === dept.name ? 'ring-2 ring-purple-500 bg-purple-50' : ''
+                }`}
+                onClick={() => setSelectedDepartment(dept.name)}
+              >
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold text-gray-900">{dept.count}</div>
+                  <div className="text-sm text-gray-500">{dept.name}</div>
+                  <div className="text-xs text-gray-400 mt-1">{dept.assignments} équipements</div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* Employees List */}
-      <div className="space-y-4">
-        {filteredEmployees.map((employee) => (
-          <Card key={employee.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                    {employee.first_name.charAt(0)}{employee.last_name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {employee.first_name} {employee.last_name}
-                    </h3>
-                    <p className="text-sm text-gray-500">{employee.position} - {employee.department}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Badge className={
-                    employee.status === 'active' ? 'bg-green-100 text-green-800' :
-                    employee.status === 'inactive' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }>
-                    {employee.status === 'active' ? 'Actif' :
-                     employee.status === 'inactive' ? 'Inactif' : 'Licencié'}
-                  </Badge>
-                  {hasPermission('admin') && (
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => openEditDialog(employee)}>
-                        Modifier
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleDelete(employee.id)}
-                        className="text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50"
-                      >
-                        Supprimer
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
+      {/* Employees Table */}
+      <Card className="border-0 shadow-lg">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Employés</CardTitle>
+              <CardDescription>Liste complète des employés et leurs attributions</CardDescription>
+            </div>
+            <Button onClick={() => {
+              setSelectedEmployee(null);
+              setShowEmployeeDialog(true);
+            }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nouvel employé
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-2 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par nom, email ou numéro d'employé..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
 
-              {/* Equipment Assignments - Mock data for now */}
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                  <User className="h-4 w-4 mr-1" />
-                  Équipements attribués:
-                </h4>
-                <div className="space-y-2">
-                  {employee.first_name === 'Marie' && (
-                    <>
-                      <div className="flex items-center justify-between p-2 bg-white rounded border">
-                        <span className="text-sm">Dell Latitude 5520</span>
-                        <span className="text-xs text-gray-500">N° Parc: PC001</span>
-                        <Badge variant="outline" className="text-xs">Attribué le 15/01/2024</Badge>
-                      </div>
-                      <div className="flex items-center justify-between p-2 bg-white rounded border">
-                        <span className="text-sm">iPhone 13</span>
-                        <span className="text-xs text-gray-500">N° Parc: SP001</span>
-                        <Badge variant="outline" className="text-xs">Attribué le 20/01/2024</Badge>
-                      </div>
-                    </>
-                  )}
-                  {employee.first_name !== 'Marie' && (
-                    <p className="text-sm text-gray-500 italic">Aucun équipement attribué</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employé</TableHead>
+                  <TableHead>N° Employé</TableHead>
+                  <TableHead>Département</TableHead>
+                  <TableHead>Poste</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Équipements attribués</TableHead>
+                  <TableHead>Date d'embauche</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredEmployees.map((employee) => {
+                  const employeeAssignments = getEmployeeAssignments(employee.id);
+                  
+                  return (
+                    <TableRow key={employee.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{employee.first_name} {employee.last_name}</div>
+                          <div className="text-sm text-gray-500">{employee.email}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{employee.employee_number}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{employee.department}</Badge>
+                      </TableCell>
+                      <TableCell>{employee.position}</TableCell>
+                      <TableCell>{getStatusBadge(employee.status)}</TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {employeeAssignments.length > 0 ? (
+                            employeeAssignments.slice(0, 2).map((assignment, index) => (
+                              <div key={assignment.id} className="text-sm">
+                                <Badge variant="secondary" className="text-xs">
+                                  {assignment.equipment_name}
+                                  {assignment.park_number && ` (${assignment.park_number})`}
+                                </Badge>
+                              </div>
+                            ))
+                          ) : (
+                            <span className="text-sm text-gray-500">Aucun équipement</span>
+                          )}
+                          {employeeAssignments.length > 2 && (
+                            <div className="text-xs text-gray-500">
+                              +{employeeAssignments.length - 2} autres
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {new Date(employee.hire_date).toLocaleDateString('fr-FR')}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(employee)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(employee.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Employee Dialog */}
+      <EmployeeDialog
+        isOpen={showEmployeeDialog}
+        onClose={() => setShowEmployeeDialog(false)}
+        employee={selectedEmployee}
+      />
     </div>
   );
 };

@@ -188,6 +188,30 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_categories: {
+        Row: {
+          created_at: string | null
+          critical_threshold: number
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          critical_threshold?: number
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          critical_threshold?: number
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       stock_items: {
         Row: {
           assigned_to: string | null

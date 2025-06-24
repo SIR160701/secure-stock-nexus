@@ -22,7 +22,7 @@ export class ChatService {
   constructor(config: ChatServiceConfig) {
     this.apiKey = config.apiKey;
     this.model = config.model || 'gpt-4';
-    this.maxTokens = config.maxTokens || 150;
+    this.maxTokens = config.maxTokens || 500;
   }
 
   async sendMessage(messages: ChatMessage[]): Promise<string> {
@@ -45,6 +45,7 @@ export class ChatService {
           })),
           max_tokens: this.maxTokens,
           temperature: 0.7,
+          system: "Tu es un assistant IA spécialisé dans la gestion de stock et d'équipements. Tu aides les utilisateurs avec leurs questions sur la gestion du matériel, les procédures, et l'organisation. Réponds toujours en français et de manière professionnelle."
         }),
       });
 
