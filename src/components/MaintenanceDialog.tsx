@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -76,20 +77,19 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
 
   const startDate = watch('startDate');
   const endDate = watch('endDate');
+  const selectedItem = watch('item');
+  const selectedParkNumber = watch('parkNumber');
 
-  // Filtrer les articles disponibles pour maintenance
   const availableItems = stockItems.filter(item => item.status === 'active');
 
   const handleFormSubmit = async (data: MaintenanceFormData) => {
-    // Trouver l'article correspondant dans le stock
     const stockItem = stockItems.find(item => item.name === data.item);
     
     if (stockItem && mode === 'create') {
-      // Changer le statut de l'article à "maintenance" dans le stock
       await updateStockItem.mutateAsync({
         id: stockItem.id,
         status: 'discontinued',
-        previous_status: stockItem.status, // Sauvegarder le statut précédent
+        previous_status: stockItem.status,
       });
 
       addActivity.mutate({
@@ -120,14 +120,42 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
     onClose();
   };
 
-  // Mettre à jour automatiquement les champs quand un article est sélectionné
   const handleItemChange = (itemName: string) => {
     setValue('item', itemName);
     const item = stockItems.find(i => i.name === itemName);
     if (item) {
       setValue('category', item.category);
-      setValue('parkNumber', item.park_number || '');
-      setValue('serialNumber', item.serial_number || '');
+    }
+    setValue('parkNumber', '');
+    setValue('serialNumber', '');
+  };
+
+  const getUniqueEquipmentNames = () => {
+    const names = [...new Set(availableItems.map(item => item.name))];
+    return names;
+  };
+
+  const getAvailableParkNumbers = (equipmentName: string) => {
+    return availableItems
+      .filter(item => item.name === equipmentName)
+      .map(item => item.park_number)
+      .filter(Boolean);
+  };
+
+  const getAvailableSerialNumbers = (equipmentName: string, parkNumber: string) => {
+    return availableItems
+      .filter(item => item.name === equipmentName && item.park_number === parkNumber)
+      .map(item => item.serial_number)
+      .filter(Boolean);
+  };
+
+  const handleParkNumberChange = (parkNumber: string) => {
+    setValue('parkNumber', parkNumber);
+    const availableSerials = getAvailableSerialNumbers(selectedItem, parkNumber);
+    if (availableSerials.length === 1) {
+      setValue('serialNumber', availableSerials[0]);
+    } else {
+      setValue('serialNumber', '');
     }
   };
 
@@ -153,9 +181,9 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
                   <SelectValue placeholder="Sélectionner un équipement" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableItems.map((item) => (
-                    <SelectItem key={item.id} value={item.name}>
-                      {item.name} {item.park_number && `(${item.park_number})`}
+                  {getUniqueEquipmentNames().map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -185,22 +213,42 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="parkNumber">N° de parc</Label>
-              <Input
-                id="parkNumber"
-                placeholder="Automatique depuis le stock"
-                {...register('parkNumber')}
-                readOnly
-              />
+              <Select 
+                onValueChange={handleParkNumberChange} 
+                value={watch('parkNumber')}
+                disabled={!selectedItem}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un n° de parc" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAvailableParkNumbers(selectedItem).map((parkNumber) => (
+                    <SelectItem key={parkNumber} value={parkNumber}>
+                      {parkNumber}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <Label htmlFor="serialNumber">N° de série</Label>
-              <Input
-                id="serialNumber"
-                placeholder="Automatique depuis le stock"
-                {...register('serialNumber')}
-                readOnly
-              />
+              <Select 
+                onValueChange={(value) => setValue('serialNumber', value)} 
+                value={watch('serialNumber')}
+                disabled={!selectedItem || !selectedParkNumber}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un n° de série" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAvailableSerialNumbers(selectedItem, selectedParkNumber).map((serialNumber) => (
+                    <SelectItem key={serialNumber} value={serialNumber}>
+                      {serialNumber}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

@@ -43,7 +43,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
   const { addActivity } = useActivityHistory();
   const { stockItems } = useStock();
 
-  // Filtrer les articles disponibles pour attribution
   const availableStockItems = stockItems.filter(item => item.status === 'active');
 
   useEffect(() => {
@@ -54,7 +53,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         department: employee.department || '',
       });
 
-      // Charger les équipements existants de l'employé
       const employeeAssignments = assignments.filter(a => a.employee_id === employee.id && a.status === 'assigned');
       if (employeeAssignments.length > 0) {
         setEquipments(employeeAssignments.map(a => ({
@@ -100,14 +98,12 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     const equipment = equipments[index];
     
     if (equipment.id && !equipment.isNew) {
-      // Supprimer de la base de données
       await deleteAssignment.mutateAsync(equipment.id);
     }
     
     if (equipments.length > 1) {
       setEquipments(equipments.filter((_, i) => i !== index));
     } else {
-      // Réinitialiser le dernier équipement
       setEquipments([
         { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
       ]);
@@ -121,11 +117,33 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
   };
 
   const handleEquipmentSelect = (index: number, selectedName: string) => {
-    const selectedItem = availableStockItems.find(item => item.name === selectedName);
-    if (selectedItem) {
-      updateEquipment(index, 'equipment_name', selectedName);
-      updateEquipment(index, 'park_number', selectedItem.park_number || '');
-      updateEquipment(index, 'serial_number', selectedItem.serial_number || '');
+    updateEquipment(index, 'equipment_name', selectedName);
+    updateEquipment(index, 'park_number', '');
+    updateEquipment(index, 'serial_number', '');
+  };
+
+  const getAvailableParkNumbers = (equipmentName: string) => {
+    return availableStockItems
+      .filter(item => item.name === equipmentName)
+      .map(item => item.park_number)
+      .filter(Boolean);
+  };
+
+  const getAvailableSerialNumbers = (equipmentName: string, parkNumber: string) => {
+    return availableStockItems
+      .filter(item => item.name === equipmentName && item.park_number === parkNumber)
+      .map(item => item.serial_number)
+      .filter(Boolean);
+  };
+
+  const handleParkNumberSelect = (index: number, parkNumber: string) => {
+    updateEquipment(index, 'park_number', parkNumber);
+    const equipment = equipments[index];
+    const availableSerials = getAvailableSerialNumbers(equipment.equipment_name, parkNumber);
+    if (availableSerials.length === 1) {
+      updateEquipment(index, 'serial_number', availableSerials[0]);
+    } else {
+      updateEquipment(index, 'serial_number', '');
     }
   };
 
@@ -135,7 +153,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     try {
       let employeeId: string;
 
-      // Données pour l'employé
       const employeeData = {
         ...formData,
         email: `${formData.first_name.toLowerCase()}.${formData.last_name.toLowerCase()}@entreprise.com`,
@@ -169,7 +186,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         });
       }
 
-      // Gérer les équipements
       for (const equipment of equipments) {
         if (equipment.equipment_name.trim()) {
           const assignmentData = {
@@ -182,13 +198,11 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
           };
 
           if (equipment.id && !equipment.isNew) {
-            // Mettre à jour l'équipement existant
             await updateAssignment.mutateAsync({
               id: equipment.id,
               ...assignmentData,
             });
           } else {
-            // Créer un nouvel équipement
             await createAssignment.mutateAsync(assignmentData);
           }
         }
@@ -199,6 +213,11 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
     }
+  };
+
+  const getUniqueEquipmentNames = () => {
+    const names = [...new Set(availableStockItems.map(item => item.name))];
+    return names;
   };
 
   return (
@@ -218,7 +237,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            {/* Informations de l'employé */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="first_name">Prénom *</Label>
@@ -251,7 +269,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
               />
             </div>
 
-            {/* Section équipements */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Équipements attribués</Label>
@@ -288,9 +305,9 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                           <SelectValue placeholder="Sélectionner un équipement" />
                         </SelectTrigger>
                         <SelectContent>
-                          {availableStockItems.map((item) => (
-                            <SelectItem key={item.id} value={item.name}>
-                              {item.name} {item.park_number && `(${item.park_number})`}
+                          {getUniqueEquipmentNames().map((name) => (
+                            <SelectItem key={name} value={name}>
+                              {name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -300,23 +317,41 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label htmlFor={`park_number_${index}`}>N° de parc</Label>
-                        <Input
-                          id={`park_number_${index}`}
+                        <Select 
+                          onValueChange={(value) => handleParkNumberSelect(index, value)} 
                           value={equipment.park_number}
-                          onChange={(e) => updateEquipment(index, 'park_number', e.target.value)}
-                          placeholder="Automatique depuis le stock"
-                          readOnly
-                        />
+                          disabled={!equipment.equipment_name}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner un n° de parc" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getAvailableParkNumbers(equipment.equipment_name).map((parkNumber) => (
+                              <SelectItem key={parkNumber} value={parkNumber}>
+                                {parkNumber}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
                         <Label htmlFor={`serial_number_${index}`}>N° de série</Label>
-                        <Input
-                          id={`serial_number_${index}`}
+                        <Select 
+                          onValueChange={(value) => updateEquipment(index, 'serial_number', value)} 
                           value={equipment.serial_number}
-                          onChange={(e) => updateEquipment(index, 'serial_number', e.target.value)}
-                          placeholder="Automatique depuis le stock"
-                          readOnly
-                        />
+                          disabled={!equipment.equipment_name || !equipment.park_number}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner un n° de série" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {getAvailableSerialNumbers(equipment.equipment_name, equipment.park_number).map((serialNumber) => (
+                              <SelectItem key={serialNumber} value={serialNumber}>
+                                {serialNumber}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     
