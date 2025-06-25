@@ -77,9 +77,8 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
 
   const startDate = watch('startDate');
   const endDate = watch('endDate');
-  const selectedItem = watch('item');
 
-  // Filtrer les articles disponibles
+  // Filtrer les articles disponibles pour maintenance
   const availableItems = stockItems.filter(item => item.status === 'active');
 
   const handleFormSubmit = async (data: MaintenanceFormData) => {
@@ -90,7 +89,8 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
       // Changer le statut de l'article à "maintenance" dans le stock
       await updateStockItem.mutateAsync({
         id: stockItem.id,
-        status: 'discontinued'
+        status: 'discontinued',
+        previous_status: stockItem.status, // Sauvegarder le statut précédent
       });
 
       addActivity.mutate({

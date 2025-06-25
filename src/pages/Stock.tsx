@@ -39,33 +39,35 @@ const Stock = () => {
     return matchesSearch && matchesCategory;
   });
 
-  // Grouper les articles par catégorie
+  // Grouper les articles par catégorie avec gestion des seuils critiques
   const itemsByCategory = categories
     .filter(category => selectedCategory === 'all' || category.name === selectedCategory)
     .map(category => {
       const categoryItems = filteredItems.filter(item => item.category === category.name);
+      const availableCount = stockItems.filter(item => 
+        item.category === category.name && item.status === 'active'
+      ).length;
+      
+      // Déterminer le statut du seuil critique
+      let thresholdStatus: 'safe' | 'warning' | 'critical' = 'safe';
+      if (availableCount <= category.critical_threshold) {
+        thresholdStatus = 'critical';
+      } else if (availableCount <= category.critical_threshold * 1.5) {
+        thresholdStatus = 'warning';
+      }
+      
       return {
         category,
-        items: categoryItems
+        items: categoryItems,
+        availableCount,
+        thresholdStatus
       };
     });
 
   // Calculer les statistiques et alertes
   const totalItems = stockItems.length;
-  const criticalItems = stockItems.filter(item => {
-    const category = categories.find(cat => cat.name === item.category);
-    const availableCount = stockItems.filter(i => 
-      i.category === item.category && i.status === 'active'
-    ).length;
-    return category && availableCount <= category.critical_threshold;
-  });
-
-  const criticalCategories = categories.filter(category => {
-    const availableCount = stockItems.filter(item => 
-      item.category === category.name && item.status === 'active'
-    ).length;
-    return availableCount <= category.critical_threshold;
-  });
+  const criticalCategories = itemsByCategory.filter(cat => cat.thresholdStatus === 'critical');
+  const warningCategories = itemsByCategory.filter(cat => cat.thresholdStatus === 'warning');
 
   const handleEditItem = (item) => {
     setSelectedItem(item);
@@ -108,6 +110,17 @@ const Stock = () => {
     setShowThresholdDialog(true);
   };
 
+  const getCriticalBadgeColor = (status: 'safe' | 'warning' | 'critical') => {
+    switch (status) {
+      case 'critical':
+        return 'bg-red-500 text-white';
+      case 'warning':
+        return 'bg-yellow-500 text-white';
+      default:
+        return 'bg-green-500 text-white';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header avec alertes */}
@@ -120,15 +133,21 @@ const Stock = () => {
               </div>
               Gestion du Stock
             </h1>
-            <p className="text-blue-100">Gérez vos articles par catégorie avec recherche intelligente</p>
+            <p className="text-blue-100">Gérez vos articles par catégorie avec alertes de seuil critique</p>
             
-            {/* Alertes critiques */}
-            {criticalCategories.length > 0 && (
+            {/* Alertes critiques par catégorie */}
+            {(criticalCategories.length > 0 || warningCategories.length > 0) && (
               <div className="mt-4 flex flex-wrap gap-2">
-                {criticalCategories.map(category => (
+                {criticalCategories.map(({ category, availableCount }) => (
                   <Badge key={category.id} variant="destructive" className="flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
-                    {category.name} - Réapprovisionnement requis
+                    {category.name} - Critique ({availableCount}/{category.critical_threshold})
+                  </Badge>
+                ))}
+                {warningCategories.map(({ category, availableCount }) => (
+                  <Badge key={category.id} className="bg-yellow-500 text-white flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {category.name} - Attention ({availableCount}/{Math.ceil(category.critical_threshold * 1.5)})
                   </Badge>
                 ))}
               </div>
@@ -139,13 +158,13 @@ const Stock = () => {
               <div className="text-2xl font-bold">{totalItems}</div>
               <div className="text-sm text-blue-200">Articles total</div>
             </div>
-            {criticalItems.length > 0 && (
+            {criticalCategories.length > 0 && (
               <div className="text-center">
                 <div className="text-2xl font-bold text-red-300 flex items-center gap-1">
                   <AlertTriangle className="h-5 w-5" />
-                  {criticalItems.length}
+                  {criticalCategories.length}
                 </div>
-                <div className="text-sm text-red-200">Critiques</div>
+                <div className="text-sm text-red-200">Catégories critiques</div>
               </div>
             )}
           </div>
@@ -176,18 +195,30 @@ const Stock = () => {
         </Button>
       </div>
 
-      {/* Affichage par catégories */}
+      {/* Affichage par catégories avec badges de statut */}
       <div className="space-y-6">
-        {itemsByCategory.map(({ category, items }) => (
-          <StockCategoryTable
-            key={category.id}
-            category={category}
-            items={items}
-            onEditItem={handleEditItem}
-            onDeleteItem={handleDeleteItem}
-            onEditThreshold={handleEditThreshold}
-            onDeleteCategory={handleDeleteCategory}
-          />
+        {itemsByCategory.map(({ category, items, availableCount, thresholdStatus }) => (
+          <div key={category.id} className="relative">
+            {/* Badge de statut de seuil */}
+            <div className="absolute top-4 right-4 z-10">
+              <Badge className={getCriticalBadgeColor(thresholdStatus)}>
+                {thresholdStatus === 'critical' && 'Critique'}
+                {thresholdStatus === 'warning' && 'Attention'}
+                {thresholdStatus === 'safe' && 'OK'}
+              </Badge>
+            </div>
+            
+            <StockCategoryTable
+              category={category}
+              items={items}
+              onEditItem={handleEditItem}
+              onDeleteItem={handleDeleteItem}
+              onEditThreshold={handleEditThreshold}
+              onDeleteCategory={handleDeleteCategory}
+              availableCount={availableCount}
+              thresholdStatus={thresholdStatus}
+            />
+          </div>
         ))}
         
         {itemsByCategory.length === 0 && (

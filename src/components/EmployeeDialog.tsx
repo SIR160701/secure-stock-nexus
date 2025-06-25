@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Trash2, Edit } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Trash2 } from 'lucide-react';
 import { useEmployees, Employee } from '@/hooks/useEmployees';
 import { useEquipmentAssignments } from '@/hooks/useEquipmentAssignments';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
+import { useStock } from '@/hooks/useStock';
 
 interface EmployeeDialogProps {
   isOpen: boolean;
@@ -39,6 +41,10 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
   const { createEmployee, updateEmployee } = useEmployees();
   const { createAssignment, updateAssignment, deleteAssignment, assignments } = useEquipmentAssignments();
   const { addActivity } = useActivityHistory();
+  const { stockItems } = useStock();
+
+  // Filtrer les articles disponibles pour attribution
+  const availableStockItems = stockItems.filter(item => item.status === 'active');
 
   useEffect(() => {
     if (employee) {
@@ -49,7 +55,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
       });
 
       // Charger les équipements existants de l'employé
-      const employeeAssignments = assignments.filter(a => a.employee_id === employee.id);
+      const employeeAssignments = assignments.filter(a => a.employee_id === employee.id && a.status === 'assigned');
       if (employeeAssignments.length > 0) {
         setEquipments(employeeAssignments.map(a => ({
           id: a.id,
@@ -114,6 +120,15 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     setEquipments(newEquipments);
   };
 
+  const handleEquipmentSelect = (index: number, selectedName: string) => {
+    const selectedItem = availableStockItems.find(item => item.name === selectedName);
+    if (selectedItem) {
+      updateEquipment(index, 'equipment_name', selectedName);
+      updateEquipment(index, 'park_number', selectedItem.park_number || '');
+      updateEquipment(index, 'serial_number', selectedItem.serial_number || '');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -163,7 +178,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
             park_number: equipment.park_number || '',
             serial_number: equipment.serial_number || '',
             assigned_date: equipment.assigned_date,
-            status: 'assigned',
+            status: 'assigned' as 'assigned' | 'returned',
           };
 
           if (equipment.id && !equipment.isNew) {
@@ -268,12 +283,18 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                     
                     <div>
                       <Label htmlFor={`equipment_name_${index}`}>Modèle de l'équipement</Label>
-                      <Input
-                        id={`equipment_name_${index}`}
-                        value={equipment.equipment_name}
-                        onChange={(e) => updateEquipment(index, 'equipment_name', e.target.value)}
-                        placeholder="Ex: Laptop Dell Latitude 5520"
-                      />
+                      <Select onValueChange={(value) => handleEquipmentSelect(index, value)} value={equipment.equipment_name}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un équipement" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableStockItems.map((item) => (
+                            <SelectItem key={item.id} value={item.name}>
+                              {item.name} {item.park_number && `(${item.park_number})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-2">
@@ -283,7 +304,8 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                           id={`park_number_${index}`}
                           value={equipment.park_number}
                           onChange={(e) => updateEquipment(index, 'park_number', e.target.value)}
-                          placeholder="Ex: PC001"
+                          placeholder="Automatique depuis le stock"
+                          readOnly
                         />
                       </div>
                       <div>
@@ -292,7 +314,8 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                           id={`serial_number_${index}`}
                           value={equipment.serial_number}
                           onChange={(e) => updateEquipment(index, 'serial_number', e.target.value)}
-                          placeholder="Ex: SN123456"
+                          placeholder="Automatique depuis le stock"
+                          readOnly
                         />
                       </div>
                     </div>

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MaintenanceDialog } from '@/components/MaintenanceDialog';
 import { MaintenanceDeleteDialog } from '@/components/MaintenanceDeleteDialog';
 import { useToast } from '@/hooks/use-toast';
+import { useActivityHistory } from '@/hooks/useActivityHistory';
+import { useStock } from '@/hooks/useStock';
 
 const Maintenance = () => {
   const { maintenanceRecords, isLoading, createMaintenanceRecord, updateMaintenanceRecord, deleteMaintenanceRecord } = useMaintenance();
@@ -17,6 +20,8 @@ const Maintenance = () => {
   const [editingItem, setEditingItem] = useState<MaintenanceRecord | null>(null);
   const [deletingItem, setDeletingItem] = useState<MaintenanceRecord | null>(null);
   const { toast } = useToast();
+  const { addActivity } = useActivityHistory();
+  const { updateStockItem, stockItems } = useStock();
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -58,6 +63,12 @@ const Maintenance = () => {
       status: data.status,
       priority: 'medium',
     });
+
+    addActivity.mutate({
+      action: 'Création',
+      description: `Nouvelle maintenance créée pour "${data.item}"`,
+      page: 'Maintenance'
+    });
   };
 
   const handleEditMaintenance = async (data: any) => {
@@ -71,17 +82,48 @@ const Maintenance = () => {
         status: data.status,
       });
       setEditingItem(null);
+
+      addActivity.mutate({
+        action: 'Modification',
+        description: `Maintenance modifiée pour "${data.item}"`,
+        page: 'Maintenance'
+      });
     }
   };
 
   const handleCloseItem = async (id: string) => {
+    const item = maintenanceRecords.find(i => i.id === id);
+    
     await updateMaintenanceRecord.mutateAsync({
       id,
       status: 'completed',
       completed_date: new Date().toISOString().split('T')[0],
     });
+
+    // Restaurer le statut précédent de l'article dans le stock
+    if (item) {
+      const stockItem = stockItems.find(s => s.name === item.equipment_name);
+      if (stockItem && stockItem.previous_status) {
+        await updateStockItem.mutateAsync({
+          id: stockItem.id,
+          status: stockItem.previous_status as 'active' | 'inactive' | 'discontinued',
+          previous_status: undefined,
+        });
+
+        addActivity.mutate({
+          action: 'Statut restauré',
+          description: `Article "${item.equipment_name}" restauré à son statut précédent`,
+          page: 'Stock'
+        });
+      }
+    }
     
-    const item = maintenanceRecords.find(i => i.id === id);
+    addActivity.mutate({
+      action: 'Clôture',
+      description: `Maintenance clôturée pour "${item?.equipment_name}"`,
+      page: 'Maintenance'
+    });
+    
     toast({
       title: 'Maintenance clôturée',
       description: `La maintenance pour ${item?.equipment_name} a été marquée comme terminée.`,
@@ -96,6 +138,12 @@ const Maintenance = () => {
   const confirmDelete = async () => {
     if (deletingItem) {
       await deleteMaintenanceRecord.mutateAsync(deletingItem.id);
+      
+      addActivity.mutate({
+        action: 'Suppression',
+        description: `Maintenance supprimée pour "${deletingItem.equipment_name}"`,
+        page: 'Maintenance'
+      });
       
       toast({
         title: 'Maintenance supprimée',

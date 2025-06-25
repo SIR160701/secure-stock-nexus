@@ -79,6 +79,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
         sku: `SKU-${Date.now()}`,
         quantity: 1,
         description: `Article: ${formData.name}`,
+        previous_status: item?.status || 'active', // Sauvegarder le statut précédent
       };
 
       let savedItem;
