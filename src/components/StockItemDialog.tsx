@@ -58,7 +58,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
       name: '',
       park_number: '',
       serial_number: '',
-      category: categories[0]?.name || '',
+      category: categories.length > 0 ? categories[0].name : '',
       status: 'active',
     });
     setMaintenanceData({
@@ -73,9 +73,17 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.name || !formData.category) {
+      return;
+    }
+    
     try {
       const itemData = {
-        ...formData,
+        name: formData.name,
+        park_number: formData.park_number,
+        serial_number: formData.serial_number,
+        category: formData.category,
+        status: formData.status,
         sku: `SKU-${Date.now()}`,
         quantity: 1,
         description: `Article: ${formData.name}`,

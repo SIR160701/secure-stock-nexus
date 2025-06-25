@@ -36,7 +36,7 @@ type MaintenanceFormData = z.infer<typeof maintenanceSchema>;
 interface MaintenanceDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: MaintenanceFormData & { id?: string }) => void;
+  onSubmit: (data: MaintenanceFormData & { id?: string }) => Promise<void>;
   initialData?: Partial<MaintenanceFormData & { id: string }>;
   mode: 'create' | 'edit';
 }
@@ -83,36 +83,45 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
   const availableItems = stockItems.filter(item => item.status === 'active');
 
   const handleFormSubmit = async (data: MaintenanceFormData) => {
-    const stockItem = stockItems.find(item => item.name === data.item);
-    
-    if (stockItem && mode === 'create') {
-      await updateStockItem.mutateAsync({
-        id: stockItem.id,
-        status: 'discontinued',
-        previous_status: stockItem.status,
+    try {
+      const stockItem = stockItems.find(item => item.name === data.item);
+      
+      if (stockItem && mode === 'create') {
+        await updateStockItem.mutateAsync({
+          id: stockItem.id,
+          status: 'discontinued',
+          previous_status: stockItem.status,
+        });
+
+        addActivity.mutate({
+          action: 'Statut modifié',
+          description: `Article "${data.item}" passé en maintenance`,
+          page: 'Stock'
+        });
+      }
+
+      await onSubmit({ ...data, id: initialData?.id });
+      
+      addActivity.mutate({
+        action: mode === 'create' ? 'Création' : 'Modification',
+        description: `Maintenance ${mode === 'create' ? 'créée' : 'modifiée'} pour "${data.item}"`,
+        page: 'Maintenance'
       });
 
-      addActivity.mutate({
-        action: 'Statut modifié',
-        description: `Article "${data.item}" passé en maintenance`,
-        page: 'Stock'
+      toast({
+        title: mode === 'create' ? 'Maintenance créée' : 'Maintenance modifiée',
+        description: `La maintenance pour ${data.item} a été ${mode === 'create' ? 'créée' : 'modifiée'} avec succès.`,
+      });
+      reset();
+      onClose();
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la sauvegarde.",
+        variant: "destructive",
       });
     }
-
-    onSubmit({ ...data, id: initialData?.id });
-    
-    addActivity.mutate({
-      action: mode === 'create' ? 'Création' : 'Modification',
-      description: `Maintenance ${mode === 'create' ? 'créée' : 'modifiée'} pour "${data.item}"`,
-      page: 'Maintenance'
-    });
-
-    toast({
-      title: mode === 'create' ? 'Maintenance créée' : 'Maintenance modifiée',
-      description: `La maintenance pour ${data.item} a été ${mode === 'create' ? 'créée' : 'modifiée'} avec succès.`,
-    });
-    reset();
-    onClose();
   };
 
   const handleClose = () => {
@@ -176,7 +185,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="item">Équipement *</Label>
-              <Select onValueChange={handleItemChange} defaultValue={initialData?.item}>
+              <Select onValueChange={handleItemChange} value={watch('item')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un équipement" />
                 </SelectTrigger>
@@ -336,7 +345,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
 
           <div>
             <Label>Statut</Label>
-            <Select onValueChange={(value: 'scheduled' | 'in_progress' | 'completed') => setValue('status', value)} defaultValue={initialData?.status || 'scheduled'}>
+            <Select onValueChange={(value: 'scheduled' | 'in_progress' | 'completed') => setValue('status', value)} value={watch('status')}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
