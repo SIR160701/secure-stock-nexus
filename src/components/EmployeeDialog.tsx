@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Edit } from 'lucide-react';
 import { useEmployees, Employee } from '@/hooks/useEmployees';
 import { useEquipmentAssignments } from '@/hooks/useEquipmentAssignments';
+import { useActivityHistory } from '@/hooks/useActivityHistory';
 
 interface EmployeeDialogProps {
   isOpen: boolean;
@@ -16,10 +17,12 @@ interface EmployeeDialogProps {
 }
 
 interface EquipmentAssignmentForm {
+  id?: string;
   equipment_name: string;
   park_number: string;
   serial_number: string;
   assigned_date: string;
+  isNew?: boolean;
 }
 
 const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employee }) => {
@@ -34,7 +37,8 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
   ]);
 
   const { createEmployee, updateEmployee } = useEmployees();
-  const { createAssignment } = useEquipmentAssignments();
+  const { createAssignment, updateAssignment, deleteAssignment, assignments } = useEquipmentAssignments();
+  const { addActivity } = useActivityHistory();
 
   useEffect(() => {
     if (employee) {
@@ -43,10 +47,27 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         last_name: employee.last_name || '',
         department: employee.department || '',
       });
+
+      // Charger les équipements existants de l'employé
+      const employeeAssignments = assignments.filter(a => a.employee_id === employee.id);
+      if (employeeAssignments.length > 0) {
+        setEquipments(employeeAssignments.map(a => ({
+          id: a.id,
+          equipment_name: a.equipment_name,
+          park_number: a.park_number,
+          serial_number: a.serial_number || '',
+          assigned_date: a.assigned_date,
+          isNew: false
+        })));
+      } else {
+        setEquipments([
+          { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
+        ]);
+      }
     } else {
       resetForm();
     }
-  }, [employee, isOpen]);
+  }, [employee, isOpen, assignments]);
 
   const resetForm = () => {
     setFormData({
@@ -64,13 +85,26 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
       equipment_name: '',
       park_number: '',
       serial_number: '',
-      assigned_date: new Date().toISOString().split('T')[0]
+      assigned_date: new Date().toISOString().split('T')[0],
+      isNew: true
     }]);
   };
 
-  const removeEquipment = (index: number) => {
+  const removeEquipment = async (index: number) => {
+    const equipment = equipments[index];
+    
+    if (equipment.id && !equipment.isNew) {
+      // Supprimer de la base de données
+      await deleteAssignment.mutateAsync(equipment.id);
+    }
+    
     if (equipments.length > 1) {
       setEquipments(equipments.filter((_, i) => i !== index));
+    } else {
+      // Réinitialiser le dernier équipement
+      setEquipments([
+        { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
+      ]);
     }
   };
 
@@ -103,22 +137,45 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
           ...employeeData,
         });
         employeeId = employee.id;
+        
+        addActivity.mutate({
+          action: 'Modification',
+          description: `Employé "${formData.first_name} ${formData.last_name}" modifié`,
+          page: 'Employés'
+        });
       } else {
         const newEmployee = await createEmployee.mutateAsync(employeeData);
         employeeId = newEmployee.id;
+        
+        addActivity.mutate({
+          action: 'Création',
+          description: `Nouvel employé "${formData.first_name} ${formData.last_name}" ajouté`,
+          page: 'Employés'
+        });
       }
 
-      // Créer les attributions d'équipements pour les équipements non-vides
+      // Gérer les équipements
       for (const equipment of equipments) {
         if (equipment.equipment_name.trim()) {
-          await createAssignment.mutateAsync({
+          const assignmentData = {
             employee_id: employeeId,
             equipment_name: equipment.equipment_name,
             park_number: equipment.park_number || '',
             serial_number: equipment.serial_number || '',
             assigned_date: equipment.assigned_date,
             status: 'assigned',
-          });
+          };
+
+          if (equipment.id && !equipment.isNew) {
+            // Mettre à jour l'équipement existant
+            await updateAssignment.mutateAsync({
+              id: equipment.id,
+              ...assignmentData,
+            });
+          } else {
+            // Créer un nouvel équipement
+            await createAssignment.mutateAsync(assignmentData);
+          }
         }
       }
       
@@ -140,7 +197,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         <DialogHeader>
           <DialogTitle>{employee ? 'Modifier l\'employé' : 'Nouvel employé'}</DialogTitle>
           <DialogDescription>
-            {employee ? 'Modifier les informations de l\'employé.' : 'Ajouter un nouvel employé avec ses équipements.'}
+            {employee ? 'Modifier les informations de l\'employé et ses équipements.' : 'Ajouter un nouvel employé avec ses équipements.'}
           </DialogDescription>
         </DialogHeader>
         
@@ -193,17 +250,20 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                 <Card key={index} className="p-4">
                   <CardContent className="space-y-3 p-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Équipement {index + 1}</span>
-                      {equipments.length > 1 && (
-                        <Button
-                          type="button"
-                          onClick={() => removeEquipment(index)}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      )}
+                      <span className="text-sm font-medium">
+                        Équipement {index + 1}
+                        {equipment.id && !equipment.isNew && (
+                          <span className="text-xs text-gray-500 ml-2">(Existant)</span>
+                        )}
+                      </span>
+                      <Button
+                        type="button"
+                        onClick={() => removeEquipment(index)}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
                     </div>
                     
                     <div>

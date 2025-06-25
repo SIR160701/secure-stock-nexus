@@ -14,6 +14,7 @@ interface StockCategoryTableProps {
   onEditItem: (item: StockItem) => void;
   onDeleteItem: (id: string) => void;
   onEditThreshold: (category: StockCategory) => void;
+  onDeleteCategory: (category: StockCategory) => void;
 }
 
 export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
@@ -21,7 +22,8 @@ export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
   items,
   onEditItem,
   onDeleteItem,
-  onEditThreshold
+  onEditThreshold,
+  onDeleteCategory
 }) => {
   const criticalItems = items.filter(item => item.quantity <= category.critical_threshold);
   const isCritical = criticalItems.length > 0;
@@ -66,6 +68,14 @@ export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
             >
               <Settings className="h-4 w-4 mr-1" />
               Modifier seuil
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onDeleteCategory(category)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </div>

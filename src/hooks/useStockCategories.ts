@@ -76,11 +76,30 @@ export const useStockCategories = () => {
     },
   });
 
+  const deleteCategory = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('stock_categories')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock-categories'] });
+      toast({
+        title: "Catégorie supprimée",
+        description: "La catégorie a été supprimée avec succès.",
+      });
+    },
+  });
+
   return {
     categories,
     isLoading,
     error,
     createCategory,
     updateCategory,
+    deleteCategory,
   };
 };

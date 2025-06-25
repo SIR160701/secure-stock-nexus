@@ -1,53 +1,71 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Package, AlertTriangle } from 'lucide-react';
+import { Plus, Package, AlertTriangle, Trash2 } from 'lucide-react';
 import { useStock } from '@/hooks/useStock';
 import { useStockCategories } from '@/hooks/useStockCategories';
+import { useActivityHistory } from '@/hooks/useActivityHistory';
 import { StockSearch } from '@/components/StockSearch';
+import { CategoryFilter } from '@/components/CategoryFilter';
 import { StockCategoryTable } from '@/components/StockCategoryTable';
 import CategoryDialog from '@/components/CategoryDialog';
 import StockItemDialog from '@/components/StockItemDialog';
 import ThresholdDialog from '@/components/ThresholdDialog';
+import { Badge } from '@/components/ui/badge';
 
 const Stock = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showItemDialog, setShowItemDialog] = useState(false);
   const [showThresholdDialog, setShowThresholdDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState(null);
 
   const { stockItems, deleteStockItem } = useStock();
-  const { categories } = useStockCategories();
+  const { categories, deleteCategory } = useStockCategories();
+  const { addActivity } = useActivityHistory();
 
-  // Filtrer les articles selon la recherche
+  // Filtrer les articles selon la recherche et la catégorie
   const filteredItems = stockItems.filter(item => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      item.name.toLowerCase().includes(search) ||
-      (item.park_number && item.park_number.toLowerCase().includes(search)) ||
-      (item.serial_number && item.serial_number.toLowerCase().includes(search)) ||
-      item.status.toLowerCase().includes(search)
-    );
+    const matchesSearch = !searchTerm || 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.park_number && item.park_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (item.serial_number && item.serial_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      item.status.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+    
+    return matchesSearch && matchesCategory;
   });
 
   // Grouper les articles par catégorie
-  const itemsByCategory = categories.map(category => {
-    const categoryItems = filteredItems.filter(item => item.category === category.name);
-    return {
-      category,
-      items: categoryItems
-    };
-  });
+  const itemsByCategory = categories
+    .filter(category => selectedCategory === 'all' || category.name === selectedCategory)
+    .map(category => {
+      const categoryItems = filteredItems.filter(item => item.category === category.name);
+      return {
+        category,
+        items: categoryItems
+      };
+    });
 
-  // Statistiques
+  // Calculer les statistiques et alertes
   const totalItems = stockItems.length;
   const criticalItems = stockItems.filter(item => {
     const category = categories.find(cat => cat.name === item.category);
-    return category && item.quantity <= category.critical_threshold;
-  }).length;
+    const availableCount = stockItems.filter(i => 
+      i.category === item.category && i.status === 'active'
+    ).length;
+    return category && availableCount <= category.critical_threshold;
+  });
+
+  const criticalCategories = categories.filter(category => {
+    const availableCount = stockItems.filter(item => 
+      item.category === category.name && item.status === 'active'
+    ).length;
+    return availableCount <= category.critical_threshold;
+  });
 
   const handleEditItem = (item) => {
     setSelectedItem(item);
@@ -56,18 +74,43 @@ const Stock = () => {
 
   const handleDeleteItem = async (id) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cet article ?')) {
+      const item = stockItems.find(i => i.id === id);
       await deleteStockItem.mutateAsync(id);
+      
+      addActivity.mutate({
+        action: 'Suppression',
+        description: `Article "${item?.name}" supprimé du stock`,
+        page: 'Stock'
+      });
+    }
+  };
+
+  const handleDeleteCategory = async (category) => {
+    const categoryItems = stockItems.filter(item => item.category === category.name);
+    if (categoryItems.length > 0) {
+      alert('Impossible de supprimer cette catégorie car elle contient des articles.');
+      return;
+    }
+    
+    if (window.confirm(`Êtes-vous sûr de vouloir supprimer la catégorie "${category.name}" ?`)) {
+      await deleteCategory.mutateAsync(category.id);
+      
+      addActivity.mutate({
+        action: 'Suppression',
+        description: `Catégorie "${category.name}" supprimée`,
+        page: 'Stock'
+      });
     }
   };
 
   const handleEditThreshold = (category) => {
-    setSelectedCategory(category);
+    setSelectedCategoryForEdit(category);
     setShowThresholdDialog(true);
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header avec alertes */}
       <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div>
@@ -78,17 +121,29 @@ const Stock = () => {
               Gestion du Stock
             </h1>
             <p className="text-blue-100">Gérez vos articles par catégorie avec recherche intelligente</p>
+            
+            {/* Alertes critiques */}
+            {criticalCategories.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {criticalCategories.map(category => (
+                  <Badge key={category.id} variant="destructive" className="flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {category.name} - Réapprovisionnement requis
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold">{totalItems}</div>
               <div className="text-sm text-blue-200">Articles total</div>
             </div>
-            {criticalItems > 0 && (
+            {criticalItems.length > 0 && (
               <div className="text-center">
                 <div className="text-2xl font-bold text-red-300 flex items-center gap-1">
                   <AlertTriangle className="h-5 w-5" />
-                  {criticalItems}
+                  {criticalItems.length}
                 </div>
                 <div className="text-sm text-red-200">Critiques</div>
               </div>
@@ -97,11 +152,16 @@ const Stock = () => {
         </div>
       </div>
 
-      {/* Barre de recherche et boutons d'action */}
+      {/* Barre de recherche, filtre et boutons d'action */}
       <div className="flex items-center gap-4">
         <StockSearch 
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
+        />
+        <CategoryFilter
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
         />
         <Button onClick={() => setShowCategoryDialog(true)} variant="outline">
           <Plus className="h-4 w-4 mr-2" />
@@ -126,6 +186,7 @@ const Stock = () => {
             onEditItem={handleEditItem}
             onDeleteItem={handleDeleteItem}
             onEditThreshold={handleEditThreshold}
+            onDeleteCategory={handleDeleteCategory}
           />
         ))}
         
@@ -161,9 +222,9 @@ const Stock = () => {
         isOpen={showThresholdDialog}
         onClose={() => {
           setShowThresholdDialog(false);
-          setSelectedCategory(null);
+          setSelectedCategoryForEdit(null);
         }}
-        category={selectedCategory}
+        category={selectedCategoryForEdit}
       />
     </div>
   );

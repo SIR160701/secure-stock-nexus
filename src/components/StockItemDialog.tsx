@@ -4,9 +4,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStock, StockItem } from '@/hooks/useStock';
 import { useStockCategories } from '@/hooks/useStockCategories';
+import { useMaintenance } from '@/hooks/useMaintenance';
+import { useActivityHistory } from '@/hooks/useActivityHistory';
 
 interface StockItemDialogProps {
   isOpen: boolean;
@@ -23,8 +26,18 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
     status: 'active' as 'active' | 'inactive' | 'discontinued',
   });
 
+  const [maintenanceData, setMaintenanceData] = useState({
+    problem_description: '',
+    technician_name: '',
+    start_date: '',
+    end_date: '',
+    maintenance_status: 'scheduled' as 'scheduled' | 'in_progress',
+  });
+
   const { createStockItem, updateStockItem } = useStock();
   const { categories } = useStockCategories();
+  const { createMaintenanceRecord } = useMaintenance();
+  const { addActivity } = useActivityHistory();
 
   useEffect(() => {
     if (item) {
@@ -48,6 +61,13 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
       category: categories[0]?.name || '',
       status: 'active',
     });
+    setMaintenanceData({
+      problem_description: '',
+      technician_name: '',
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: '',
+      maintenance_status: 'scheduled',
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,13 +81,45 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
         description: `Article: ${formData.name}`,
       };
 
+      let savedItem;
       if (item) {
-        await updateStockItem.mutateAsync({
+        savedItem = await updateStockItem.mutateAsync({
           id: item.id,
           ...itemData,
         });
+        
+        addActivity.mutate({
+          action: 'Modification',
+          description: `Article "${formData.name}" modifié`,
+          page: 'Stock'
+        });
       } else {
-        await createStockItem.mutateAsync(itemData);
+        savedItem = await createStockItem.mutateAsync(itemData);
+        
+        addActivity.mutate({
+          action: 'Création',
+          description: `Nouvel article "${formData.name}" ajouté au stock`,
+          page: 'Stock'
+        });
+      }
+
+      // Si le statut est "maintenance", créer un enregistrement de maintenance
+      if (formData.status === 'discontinued' && maintenanceData.problem_description) {
+        await createMaintenanceRecord.mutateAsync({
+          equipment_name: formData.name,
+          maintenance_type: 'corrective',
+          description: maintenanceData.problem_description,
+          scheduled_date: maintenanceData.start_date,
+          completed_date: maintenanceData.end_date || undefined,
+          status: maintenanceData.maintenance_status,
+          priority: 'medium',
+        });
+
+        addActivity.mutate({
+          action: 'Maintenance',
+          description: `Maintenance créée pour "${formData.name}"`,
+          page: 'Maintenance'
+        });
       }
       
       resetForm();
@@ -90,7 +142,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
         onClose();
       }
     }}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{item ? 'Modifier l\'article' : 'Nouvel article'}</DialogTitle>
           <DialogDescription>
@@ -171,6 +223,75 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Champs de maintenance si statut = "maintenance" */}
+            {formData.status === 'discontinued' && (
+              <div className="border-t pt-4 space-y-4">
+                <h3 className="text-lg font-semibold">Informations de maintenance</h3>
+                
+                <div>
+                  <Label htmlFor="problem_description">Description du problème *</Label>
+                  <Textarea
+                    id="problem_description"
+                    value={maintenanceData.problem_description}
+                    onChange={(e) => setMaintenanceData({ ...maintenanceData, problem_description: e.target.value })}
+                    placeholder="Décrivez le problème rencontré..."
+                    required={formData.status === 'discontinued'}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="technician_name">Nom du technicien *</Label>
+                  <Input
+                    id="technician_name"
+                    value={maintenanceData.technician_name}
+                    onChange={(e) => setMaintenanceData({ ...maintenanceData, technician_name: e.target.value })}
+                    placeholder="Ex: Jean Technicien"
+                    required={formData.status === 'discontinued'}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="start_date">Date de début *</Label>
+                    <Input
+                      id="start_date"
+                      type="date"
+                      value={maintenanceData.start_date}
+                      onChange={(e) => setMaintenanceData({ ...maintenanceData, start_date: e.target.value })}
+                      required={formData.status === 'discontinued'}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="end_date">Date de fin prévue</Label>
+                    <Input
+                      id="end_date"
+                      type="date"
+                      value={maintenanceData.end_date}
+                      onChange={(e) => setMaintenanceData({ ...maintenanceData, end_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="maintenance_status">Statut de maintenance *</Label>
+                  <Select 
+                    value={maintenanceData.maintenance_status} 
+                    onValueChange={(value: 'scheduled' | 'in_progress') => 
+                      setMaintenanceData({ ...maintenanceData, maintenance_status: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="scheduled">Planifié</SelectItem>
+                      <SelectItem value="in_progress">En cours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </div>
           
           <DialogFooter>
