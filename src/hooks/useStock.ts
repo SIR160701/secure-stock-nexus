@@ -18,6 +18,7 @@ export interface StockItem {
   serial_number?: string;
   assigned_to?: string;
   status: 'active' | 'inactive' | 'discontinued';
+  previous_status?: string;
   created_at: string;
   updated_at: string;
 }

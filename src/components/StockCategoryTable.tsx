@@ -15,6 +15,8 @@ interface StockCategoryTableProps {
   onDeleteItem: (id: string) => void;
   onEditThreshold: (category: StockCategory) => void;
   onDeleteCategory: (category: StockCategory) => void;
+  availableCount: number;
+  thresholdStatus: 'safe' | 'warning' | 'critical';
 }
 
 export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
@@ -23,7 +25,9 @@ export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
   onEditItem,
   onDeleteItem,
   onEditThreshold,
-  onDeleteCategory
+  onDeleteCategory,
+  availableCount,
+  thresholdStatus
 }) => {
   const criticalItems = items.filter(item => item.quantity <= category.critical_threshold);
   const isCritical = criticalItems.length > 0;
@@ -59,7 +63,7 @@ export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
-              Seuil critique: {category.critical_threshold}
+              Seuil critique: {category.critical_threshold} | Disponibles: {availableCount}
             </span>
             <Button
               variant="outline"
