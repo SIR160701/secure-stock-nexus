@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Trash2, Edit } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useEmployees, Employee } from '@/hooks/useEmployees';
 import { useEquipmentAssignments } from '@/hooks/useEquipmentAssignments';
+import { useStock } from '@/hooks/useStock';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
 
 interface EmployeeDialogProps {
@@ -38,6 +39,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
 
   const { createEmployee, updateEmployee } = useEmployees();
   const { createAssignment, updateAssignment, deleteAssignment, assignments } = useEquipmentAssignments();
+  const { stockItems, createStockItem, updateStockItem } = useStock();
   const { addActivity } = useActivityHistory();
 
   useEffect(() => {
@@ -48,7 +50,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         department: employee.department || '',
       });
 
-      // Charger les équipements existants de l'employé
       const employeeAssignments = assignments.filter(a => a.employee_id === employee.id);
       if (employeeAssignments.length > 0) {
         setEquipments(employeeAssignments.map(a => ({
@@ -94,14 +95,25 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     const equipment = equipments[index];
     
     if (equipment.id && !equipment.isNew) {
-      // Supprimer de la base de données
       await deleteAssignment.mutateAsync(equipment.id);
+      
+      // Remettre l'article en "disponible" dans le stock
+      const stockItem = stockItems.find(item => 
+        item.name === equipment.equipment_name && 
+        (item.park_number === equipment.park_number || item.serial_number === equipment.serial_number)
+      );
+      
+      if (stockItem) {
+        await updateStockItem.mutateAsync({
+          id: stockItem.id,
+          status: 'active'
+        });
+      }
     }
     
     if (equipments.length > 1) {
       setEquipments(equipments.filter((_, i) => i !== index));
     } else {
-      // Réinitialiser le dernier équipement
       setEquipments([
         { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
       ]);
@@ -120,7 +132,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     try {
       let employeeId: string;
 
-      // Données pour l'employé
       const employeeData = {
         ...formData,
         email: `${formData.first_name.toLowerCase()}.${formData.last_name.toLowerCase()}@entreprise.com`,
@@ -157,23 +168,47 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
       // Gérer les équipements
       for (const equipment of equipments) {
         if (equipment.equipment_name.trim()) {
+          // Vérifier si l'article existe dans le stock
+          let stockItem = stockItems.find(item => 
+            item.name === equipment.equipment_name && 
+            (item.park_number === equipment.park_number || item.serial_number === equipment.serial_number)
+          );
+
+          if (stockItem) {
+            // Article existe, changer son statut à "Alloué"
+            await updateStockItem.mutateAsync({
+              id: stockItem.id,
+              status: 'inactive'
+            });
+          } else {
+            // Article n'existe pas, le créer avec statut "Alloué"
+            await createStockItem.mutateAsync({
+              name: equipment.equipment_name,
+              park_number: equipment.park_number,
+              serial_number: equipment.serial_number,
+              category: 'Équipement',
+              sku: `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              quantity: 1,
+              status: 'inactive',
+              description: `Article créé depuis l'attribution à ${formData.first_name} ${formData.last_name}`,
+            });
+          }
+
           const assignmentData = {
             employee_id: employeeId,
             equipment_name: equipment.equipment_name,
             park_number: equipment.park_number || '',
             serial_number: equipment.serial_number || '',
             assigned_date: equipment.assigned_date,
-            status: 'assigned',
+            status: 'assigned' as 'assigned' | 'returned',
           };
 
           if (equipment.id && !equipment.isNew) {
-            // Mettre à jour l'équipement existant
             await updateAssignment.mutateAsync({
               id: equipment.id,
               ...assignmentData,
             });
           } else {
-            // Créer un nouvel équipement
             await createAssignment.mutateAsync(assignmentData);
           }
         }
@@ -203,7 +238,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            {/* Informations de l'employé */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="first_name">Prénom *</Label>
@@ -236,7 +270,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
               />
             </div>
 
-            {/* Section équipements */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Équipements attribués</Label>

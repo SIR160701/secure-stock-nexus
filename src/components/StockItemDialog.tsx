@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useStock, StockItem } from '@/hooks/useStock';
 import { useStockCategories } from '@/hooks/useStockCategories';
-import { useMaintenance } from '@/hooks/useMaintenance';
+import { useEmployees } from '@/hooks/useEmployees';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
 
 interface StockItemDialogProps {
@@ -26,17 +26,16 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
     status: 'active' as 'active' | 'inactive' | 'discontinued',
   });
 
-  const [maintenanceData, setMaintenanceData] = useState({
-    problem_description: '',
-    technician_name: '',
-    start_date: '',
-    end_date: '',
-    maintenance_status: 'scheduled' as 'scheduled' | 'in_progress',
+  const [allocatedData, setAllocatedData] = useState({
+    first_name: '',
+    last_name: '',
+    department: '',
+    assigned_date: new Date().toISOString().split('T')[0],
   });
 
   const { createStockItem, updateStockItem } = useStock();
   const { categories } = useStockCategories();
-  const { createMaintenanceRecord } = useMaintenance();
+  const { createEmployee } = useEmployees();
   const { addActivity } = useActivityHistory();
 
   useEffect(() => {
@@ -61,12 +60,11 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
       category: categories[0]?.name || '',
       status: 'active',
     });
-    setMaintenanceData({
-      problem_description: '',
-      technician_name: '',
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: '',
-      maintenance_status: 'scheduled',
+    setAllocatedData({
+      first_name: '',
+      last_name: '',
+      department: '',
+      assigned_date: new Date().toISOString().split('T')[0],
     });
   };
 
@@ -103,22 +101,26 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
         });
       }
 
-      // Si le statut est "maintenance", créer un enregistrement de maintenance
-      if (formData.status === 'discontinued' && maintenanceData.problem_description) {
-        await createMaintenanceRecord.mutateAsync({
-          equipment_name: formData.name,
-          maintenance_type: 'corrective',
-          description: maintenanceData.problem_description,
-          scheduled_date: maintenanceData.start_date,
-          completed_date: maintenanceData.end_date || undefined,
-          status: maintenanceData.maintenance_status,
-          priority: 'medium',
-        });
+      // Si le statut est "Alloué", créer un employé
+      if (formData.status === 'inactive' && allocatedData.first_name && allocatedData.last_name) {
+        const employeeData = {
+          first_name: allocatedData.first_name,
+          last_name: allocatedData.last_name,
+          department: allocatedData.department,
+          email: `${allocatedData.first_name.toLowerCase()}.${allocatedData.last_name.toLowerCase()}@entreprise.com`,
+          employee_number: `EMP-${Date.now()}`,
+          position: 'Employé',
+          hire_date: allocatedData.assigned_date,
+          status: 'active' as 'active' | 'inactive' | 'terminated',
+          phone: '',
+        };
+
+        await createEmployee.mutateAsync(employeeData);
 
         addActivity.mutate({
-          action: 'Maintenance',
-          description: `Maintenance créée pour "${formData.name}"`,
-          page: 'Maintenance'
+          action: 'Attribution',
+          description: `Article "${formData.name}" attribué à ${allocatedData.first_name} ${allocatedData.last_name}`,
+          page: 'Employés'
         });
       }
       
@@ -224,71 +226,54 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
               </Select>
             </div>
 
-            {/* Champs de maintenance si statut = "maintenance" */}
-            {formData.status === 'discontinued' && (
+            {/* Champs d'allocation si statut = "Alloué" */}
+            {formData.status === 'inactive' && (
               <div className="border-t pt-4 space-y-4">
-                <h3 className="text-lg font-semibold">Informations de maintenance</h3>
+                <h3 className="text-lg font-semibold">Informations d'attribution</h3>
                 
-                <div>
-                  <Label htmlFor="problem_description">Description du problème *</Label>
-                  <Textarea
-                    id="problem_description"
-                    value={maintenanceData.problem_description}
-                    onChange={(e) => setMaintenanceData({ ...maintenanceData, problem_description: e.target.value })}
-                    placeholder="Décrivez le problème rencontré..."
-                    required={formData.status === 'discontinued'}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="technician_name">Nom du technicien *</Label>
-                  <Input
-                    id="technician_name"
-                    value={maintenanceData.technician_name}
-                    onChange={(e) => setMaintenanceData({ ...maintenanceData, technician_name: e.target.value })}
-                    placeholder="Ex: Jean Technicien"
-                    required={formData.status === 'discontinued'}
-                  />
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="start_date">Date de début *</Label>
+                    <Label htmlFor="first_name">Prénom *</Label>
                     <Input
-                      id="start_date"
-                      type="date"
-                      value={maintenanceData.start_date}
-                      onChange={(e) => setMaintenanceData({ ...maintenanceData, start_date: e.target.value })}
-                      required={formData.status === 'discontinued'}
+                      id="first_name"
+                      value={allocatedData.first_name}
+                      onChange={(e) => setAllocatedData({ ...allocatedData, first_name: e.target.value })}
+                      placeholder="Prénom de la personne"
+                      required={formData.status === 'inactive'}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="end_date">Date de fin prévue</Label>
+                    <Label htmlFor="last_name">Nom *</Label>
                     <Input
-                      id="end_date"
-                      type="date"
-                      value={maintenanceData.end_date}
-                      onChange={(e) => setMaintenanceData({ ...maintenanceData, end_date: e.target.value })}
+                      id="last_name"
+                      value={allocatedData.last_name}
+                      onChange={(e) => setAllocatedData({ ...allocatedData, last_name: e.target.value })}
+                      placeholder="Nom de la personne"
+                      required={formData.status === 'inactive'}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <Label htmlFor="maintenance_status">Statut de maintenance *</Label>
-                  <Select 
-                    value={maintenanceData.maintenance_status} 
-                    onValueChange={(value: 'scheduled' | 'in_progress') => 
-                      setMaintenanceData({ ...maintenanceData, maintenance_status: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="scheduled">Planifié</SelectItem>
-                      <SelectItem value="in_progress">En cours</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="department">Département *</Label>
+                  <Input
+                    id="department"
+                    value={allocatedData.department}
+                    onChange={(e) => setAllocatedData({ ...allocatedData, department: e.target.value })}
+                    placeholder="Ex: Informatique, RH, Comptabilité..."
+                    required={formData.status === 'inactive'}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="assigned_date">Date d'attribution *</Label>
+                  <Input
+                    id="assigned_date"
+                    type="date"
+                    value={allocatedData.assigned_date}
+                    onChange={(e) => setAllocatedData({ ...allocatedData, assigned_date: e.target.value })}
+                    required={formData.status === 'inactive'}
+                  />
                 </div>
               </div>
             )}

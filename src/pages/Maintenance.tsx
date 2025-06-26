@@ -1,22 +1,27 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Settings, Plus, Calendar, User, Trash2, Edit } from 'lucide-react';
+import { Settings, Plus, Calendar, Trash2, Edit } from 'lucide-react';
 import { useMaintenance, MaintenanceRecord } from '@/hooks/useMaintenance';
 import { useAuth } from '@/contexts/AuthContext';
+import { useStock } from '@/hooks/useStock';
 import { MaintenanceDialog } from '@/components/MaintenanceDialog';
 import { MaintenanceDeleteDialog } from '@/components/MaintenanceDeleteDialog';
 import { useToast } from '@/hooks/use-toast';
+import { useActivityHistory } from '@/hooks/useActivityHistory';
 
 const Maintenance = () => {
   const { maintenanceRecords, isLoading, createMaintenanceRecord, updateMaintenanceRecord, deleteMaintenanceRecord } = useMaintenance();
   const { hasPermission } = useAuth();
+  const { stockItems, updateStockItem } = useStock();
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<MaintenanceRecord | null>(null);
   const [deletingItem, setDeletingItem] = useState<MaintenanceRecord | null>(null);
   const { toast } = useToast();
+  const { addActivity } = useActivityHistory();
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -58,6 +63,12 @@ const Maintenance = () => {
       status: data.status,
       priority: 'medium',
     });
+
+    addActivity.mutate({
+      action: 'Création',
+      description: `Nouvelle maintenance créée pour "${data.item}"`,
+      page: 'Maintenance'
+    });
   };
 
   const handleEditMaintenance = async (data: any) => {
@@ -71,21 +82,51 @@ const Maintenance = () => {
         status: data.status,
       });
       setEditingItem(null);
+
+      addActivity.mutate({
+        action: 'Modification',
+        description: `Maintenance modifiée pour "${data.item}"`,
+        page: 'Maintenance'
+      });
     }
   };
 
   const handleCloseItem = async (id: string) => {
-    await updateMaintenanceRecord.mutateAsync({
-      id,
-      status: 'completed',
-      completed_date: new Date().toISOString().split('T')[0],
-    });
-    
     const item = maintenanceRecords.find(i => i.id === id);
-    toast({
-      title: 'Maintenance clôturée',
-      description: `La maintenance pour ${item?.equipment_name} a été marquée comme terminée.`,
-    });
+    
+    if (item) {
+      // Chercher l'article correspondant dans le stock
+      const stockItem = stockItems.find(stock => 
+        stock.name === item.equipment_name && 
+        (stock.park_number === item.equipment_name || stock.serial_number === item.equipment_name)
+      );
+
+      if (stockItem && stockItem.previous_status) {
+        // Remettre l'article à son état précédent
+        await updateStockItem.mutateAsync({
+          id: stockItem.id,
+          status: stockItem.previous_status,
+          previous_status: undefined
+        });
+      }
+
+      await updateMaintenanceRecord.mutateAsync({
+        id,
+        status: 'completed',
+        completed_date: new Date().toISOString().split('T')[0],
+      });
+      
+      toast({
+        title: 'Maintenance clôturée',
+        description: `La maintenance pour ${item?.equipment_name} a été marquée comme terminée.`,
+      });
+
+      addActivity.mutate({
+        action: 'Clôture',
+        description: `Maintenance clôturée pour "${item.equipment_name}"`,
+        page: 'Maintenance'
+      });
+    }
   };
 
   const handleDeleteItem = (item: MaintenanceRecord) => {
@@ -100,6 +141,12 @@ const Maintenance = () => {
       toast({
         title: 'Maintenance supprimée',
         description: `La maintenance pour ${deletingItem.equipment_name} a été supprimée.`,
+      });
+
+      addActivity.mutate({
+        action: 'Suppression',
+        description: `Maintenance supprimée pour "${deletingItem.equipment_name}"`,
+        page: 'Maintenance'
       });
       
       setDeletingItem(null);

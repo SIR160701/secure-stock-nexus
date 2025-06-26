@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { useStock } from '@/hooks/useStock';
 import { useStockCategories } from '@/hooks/useStockCategories';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
 
@@ -49,7 +48,6 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
   mode
 }) => {
   const { toast } = useToast();
-  const { stockItems, updateStockItem } = useStock();
   const { categories } = useStockCategories();
   const { addActivity } = useActivityHistory();
   
@@ -77,29 +75,8 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
 
   const startDate = watch('startDate');
   const endDate = watch('endDate');
-  const selectedItem = watch('item');
-
-  // Filtrer les articles disponibles
-  const availableItems = stockItems.filter(item => item.status === 'active');
 
   const handleFormSubmit = async (data: MaintenanceFormData) => {
-    // Trouver l'article correspondant dans le stock
-    const stockItem = stockItems.find(item => item.name === data.item);
-    
-    if (stockItem && mode === 'create') {
-      // Changer le statut de l'article à "maintenance" dans le stock
-      await updateStockItem.mutateAsync({
-        id: stockItem.id,
-        status: 'discontinued'
-      });
-
-      addActivity.mutate({
-        action: 'Statut modifié',
-        description: `Article "${data.item}" passé en maintenance`,
-        page: 'Stock'
-      });
-    }
-
     onSubmit({ ...data, id: initialData?.id });
     
     addActivity.mutate({
@@ -121,17 +98,6 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
     onClose();
   };
 
-  // Mettre à jour automatiquement les champs quand un article est sélectionné
-  const handleItemChange = (itemName: string) => {
-    setValue('item', itemName);
-    const item = stockItems.find(i => i.name === itemName);
-    if (item) {
-      setValue('category', item.category);
-      setValue('parkNumber', item.park_number || '');
-      setValue('serialNumber', item.serial_number || '');
-    }
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -148,19 +114,12 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="item">Équipement *</Label>
-              <Select onValueChange={handleItemChange} defaultValue={initialData?.item}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un équipement" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableItems.map((item) => (
-                    <SelectItem key={item.id} value={item.name}>
-                      {item.name} {item.park_number && `(${item.park_number})`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="item">Modèle d'équipement *</Label>
+              <Input
+                id="item"
+                placeholder="Ex: Laptop Dell Latitude 5520"
+                {...register('item')}
+              />
               {errors.item && (
                 <p className="text-sm text-red-500 mt-1">{errors.item.message}</p>
               )}
@@ -170,7 +129,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
               <Label htmlFor="category">Catégorie *</Label>
               <Select onValueChange={(value) => setValue('category', value)} value={watch('category')}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Catégorie automatique" />
+                  <SelectValue placeholder="Sélectionner une catégorie" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
@@ -180,6 +139,9 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
                   ))}
                 </SelectContent>
               </Select>
+              {errors.category && (
+                <p className="text-sm text-red-500 mt-1">{errors.category.message}</p>
+              )}
             </div>
           </div>
 
@@ -188,9 +150,8 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
               <Label htmlFor="parkNumber">N° de parc</Label>
               <Input
                 id="parkNumber"
-                placeholder="Automatique depuis le stock"
+                placeholder="Ex: PC001"
                 {...register('parkNumber')}
-                readOnly
               />
             </div>
 
@@ -198,9 +159,8 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
               <Label htmlFor="serialNumber">N° de série</Label>
               <Input
                 id="serialNumber"
-                placeholder="Automatique depuis le stock"
+                placeholder="Ex: SN123456"
                 {...register('serialNumber')}
-                readOnly
               />
             </div>
           </div>

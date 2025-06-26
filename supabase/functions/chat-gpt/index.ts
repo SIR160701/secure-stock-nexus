@@ -24,21 +24,21 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
           { 
             role: 'system', 
-            content: 'Tu es un assistant IA spécialisé dans la gestion de stock et d\'équipements. Tu aides les utilisateurs avec leurs questions sur la gestion du matériel, les procédures, et l\'organisation. Réponds toujours en français et de manière professionnelle.' 
+            content: 'Tu es un assistant IA spécialisé dans la gestion de stock et d\'équipements. Tu aides les utilisateurs avec leurs questions sur la gestion du matériel, les procédures, et l\'organisation. Réponds toujours en français et de manière professionnelle et utile. Tu peux donner des conseils pratiques, expliquer des processus, et aider à résoudre des problèmes liés à la gestion d\'inventaire, d\'équipements, de maintenance, et de personnel.' 
           },
           ...messages
         ],
-        max_tokens: 1000,
+        max_tokens: 1500,
         temperature: 0.7,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${response.statusText}`);
     }
 
     const data = await response.json();
@@ -49,7 +49,10 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('Error in chat-gpt function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: 'Erreur de connexion au service IA',
+      details: error.message 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

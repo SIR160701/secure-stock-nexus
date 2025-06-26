@@ -10,6 +10,7 @@ export interface EquipmentAssignment {
   park_number: string;
   serial_number?: string;
   assigned_date: string;
+  returned_date?: string;
   status: 'assigned' | 'returned';
   notes?: string;
   created_at: string;
@@ -25,11 +26,8 @@ export const useEquipmentAssignments = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('equipment_assignments')
-        .select(`
-          *,
-          employees:employee_id(first_name, last_name)
-        `)
-        .order('assigned_date', { ascending: false });
+        .select('*')
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       return data as EquipmentAssignment[];
