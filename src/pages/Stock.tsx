@@ -22,7 +22,7 @@ const Stock = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedCategoryForEdit, setSelectedCategoryForEdit] = useState(null);
 
-  const { stockItems, deleteStockItem } = useStock();
+  const { stockItems, deleteStockItem, getCategoryThresholdStatus } = useStock();
   const { categories, deleteCategory } = useStockCategories();
   const { addActivity } = useActivityHistory();
 
@@ -39,32 +39,31 @@ const Stock = () => {
     return matchesSearch && matchesCategory;
   });
 
-  // Grouper les articles par catégorie
+  // Grouper les articles par catégorie avec calcul du statut de seuil
   const itemsByCategory = categories
     .filter(category => selectedCategory === 'all' || category.name === selectedCategory)
     .map(category => {
       const categoryItems = filteredItems.filter(item => item.category === category.name);
+      const thresholdInfo = getCategoryThresholdStatus(category.name, category.critical_threshold);
+      
       return {
         category,
-        items: categoryItems
+        items: categoryItems,
+        availableCount: thresholdInfo.count,
+        thresholdStatus: thresholdInfo.status
       };
     });
 
-  // Calculer les statistiques et alertes
+  // Calculer les statistiques globales
   const totalItems = stockItems.length;
-  const criticalItems = stockItems.filter(item => {
-    const category = categories.find(cat => cat.name === item.category);
-    const availableCount = stockItems.filter(i => 
-      i.category === item.category && i.status === 'active'
-    ).length;
-    return category && availableCount <= category.critical_threshold;
+  const criticalCategories = categories.filter(category => {
+    const thresholdInfo = getCategoryThresholdStatus(category.name, category.critical_threshold);
+    return thresholdInfo.status === 'critical';
   });
 
-  const criticalCategories = categories.filter(category => {
-    const availableCount = stockItems.filter(item => 
-      item.category === category.name && item.status === 'active'
-    ).length;
-    return availableCount <= category.critical_threshold;
+  const warningCategories = categories.filter(category => {
+    const thresholdInfo = getCategoryThresholdStatus(category.name, category.critical_threshold);
+    return thresholdInfo.status === 'warning';
   });
 
   const handleEditItem = (item) => {
@@ -120,13 +119,19 @@ const Stock = () => {
               </div>
               Gestion du Stock
             </h1>
-            <p className="text-blue-100">Gérez vos articles par catégorie avec recherche intelligente</p>
+            <p className="text-blue-100">Gérez vos articles par catégorie avec suivi des seuils critiques</p>
             
-            {/* Alertes critiques */}
-            {criticalCategories.length > 0 && (
+            {/* Alertes critiques par catégorie */}
+            {(criticalCategories.length > 0 || warningCategories.length > 0) && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {criticalCategories.map(category => (
                   <Badge key={category.id} variant="destructive" className="flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {category.name} - Stock critique
+                  </Badge>
+                ))}
+                {warningCategories.map(category => (
+                  <Badge key={category.id} className="bg-orange-100 text-orange-800 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
                     {category.name} - Réapprovisionnement requis
                   </Badge>
@@ -139,13 +144,13 @@ const Stock = () => {
               <div className="text-2xl font-bold">{totalItems}</div>
               <div className="text-sm text-blue-200">Articles total</div>
             </div>
-            {criticalItems.length > 0 && (
+            {criticalCategories.length > 0 && (
               <div className="text-center">
                 <div className="text-2xl font-bold text-red-300 flex items-center gap-1">
                   <AlertTriangle className="h-5 w-5" />
-                  {criticalItems.length}
+                  {criticalCategories.length}
                 </div>
-                <div className="text-sm text-red-200">Critiques</div>
+                <div className="text-sm text-red-200">Catégories critiques</div>
               </div>
             )}
           </div>
@@ -178,7 +183,7 @@ const Stock = () => {
 
       {/* Affichage par catégories */}
       <div className="space-y-6">
-        {itemsByCategory.map(({ category, items }) => (
+        {itemsByCategory.map(({ category, items, availableCount, thresholdStatus }) => (
           <StockCategoryTable
             key={category.id}
             category={category}
@@ -187,6 +192,8 @@ const Stock = () => {
             onDeleteItem={handleDeleteItem}
             onEditThreshold={handleEditThreshold}
             onDeleteCategory={handleDeleteCategory}
+            availableCount={availableCount}
+            thresholdStatus={thresholdStatus}
           />
         ))}
         

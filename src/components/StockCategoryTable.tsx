@@ -44,11 +44,12 @@ export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
 
   const getThresholdBadge = () => {
     if (thresholdStatus === 'critical') {
-      return <Badge variant="destructive">Critique</Badge>;
+      return <Badge variant="destructive">Critique - Réapprovisionnement urgent</Badge>;
     } else if (thresholdStatus === 'warning') {
-      return <Badge className="bg-orange-100 text-orange-800">Attention</Badge>;
+      return <Badge className="bg-orange-100 text-orange-800">Attention - Réapprovisionnement requis</Badge>;
+    } else {
+      return <Badge className="bg-green-100 text-green-800">Stock normal</Badge>;
     }
-    return null;
   };
 
   return (
@@ -58,7 +59,10 @@ export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
           <div className="flex items-center gap-3">
             <CardTitle className="text-xl">{category.name}</CardTitle>
             <Badge variant="outline" className="text-sm">
-              {items.length} article{items.length > 1 ? 's' : ''}
+              {items.length} article{items.length > 1 ? 's' : ''} total
+            </Badge>
+            <Badge variant="outline" className="text-sm">
+              {availableCount} disponible{availableCount > 1 ? 's' : ''}
             </Badge>
             {getThresholdBadge()}
           </div>

@@ -108,6 +108,21 @@ export const useStock = () => {
     },
   });
 
+  // Fonction pour calculer le statut du seuil critique d'une catégorie
+  const getCategoryThresholdStatus = (categoryName: string, criticalThreshold: number) => {
+    const availableCount = stockItems.filter(item => 
+      item.category === categoryName && item.status === 'active'
+    ).length;
+
+    if (availableCount === 0) {
+      return { status: 'critical', count: availableCount };
+    } else if (availableCount <= criticalThreshold) {
+      return { status: 'warning', count: availableCount };
+    } else {
+      return { status: 'normal', count: availableCount };
+    }
+  };
+
   return {
     stockItems,
     isLoading,
@@ -115,5 +130,6 @@ export const useStock = () => {
     createStockItem,
     updateStockItem,
     deleteStockItem,
+    getCategoryThresholdStatus,
   };
 };

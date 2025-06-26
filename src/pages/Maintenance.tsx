@@ -1,297 +1,274 @@
-
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Settings, Plus, Calendar, Trash2, Edit } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Wrench, Calendar, AlertTriangle, CheckCircle, Clock, Edit, Trash2 } from 'lucide-react';
 import { useMaintenance, MaintenanceRecord } from '@/hooks/useMaintenance';
-import { useAuth } from '@/contexts/AuthContext';
 import { useStock } from '@/hooks/useStock';
-import { MaintenanceDialog } from '@/components/MaintenanceDialog';
-import { MaintenanceDeleteDialog } from '@/components/MaintenanceDeleteDialog';
-import { useToast } from '@/hooks/use-toast';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
+import MaintenanceDialog from '@/components/MaintenanceDialog';
+import MaintenanceDeleteDialog from '@/components/MaintenanceDeleteDialog';
 
 const Maintenance = () => {
-  const { maintenanceRecords, isLoading, createMaintenanceRecord, updateMaintenanceRecord, deleteMaintenanceRecord } = useMaintenance();
-  const { hasPermission } = useAuth();
-  const { stockItems, updateStockItem } = useStock();
   const [showDialog, setShowDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [editingItem, setEditingItem] = useState<MaintenanceRecord | null>(null);
-  const [deletingItem, setDeletingItem] = useState<MaintenanceRecord | null>(null);
-  const { toast } = useToast();
+  const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+  const [recordToDelete, setRecordToDelete] = useState<MaintenanceRecord | null>(null);
+
+  const { maintenanceRecords, updateMaintenanceRecord } = useMaintenance();
+  const { stockItems, updateStockItem } = useStock();
   const { addActivity } = useActivityHistory();
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      scheduled: { label: 'Planifiée', className: 'bg-blue-100 text-blue-800' },
-      in_progress: { label: 'En cours', className: 'bg-yellow-100 text-yellow-800' },
-      completed: { label: 'Terminée', className: 'bg-green-100 text-green-800' },
-      cancelled: { label: 'Annulée', className: 'bg-red-100 text-red-800' }
-    };
-    
-    return (
-      <Badge className={statusConfig[status as keyof typeof statusConfig].className}>
-        {statusConfig[status as keyof typeof statusConfig].label}
-      </Badge>
-    );
+    switch (status) {
+      case 'scheduled':
+        return <Badge className="bg-blue-100 text-blue-800"><Calendar className="h-3 w-3 mr-1" />Planifié</Badge>;
+      case 'in_progress':
+        return <Badge className="bg-orange-100 text-orange-800"><Clock className="h-3 w-3 mr-1" />En cours</Badge>;
+      case 'completed':
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Terminé</Badge>;
+      case 'cancelled':
+        return <Badge variant="secondary">Annulé</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
   };
 
   const getPriorityBadge = (priority: string) => {
-    const priorityConfig = {
-      low: { label: 'Basse', className: 'bg-gray-100 text-gray-800' },
-      medium: { label: 'Moyenne', className: 'bg-blue-100 text-blue-800' },
-      high: { label: 'Haute', className: 'bg-orange-100 text-orange-800' },
-      critical: { label: 'Critique', className: 'bg-red-100 text-red-800' }
-    };
-    
-    return (
-      <Badge className={priorityConfig[priority as keyof typeof priorityConfig].className}>
-        {priorityConfig[priority as keyof typeof priorityConfig].label}
-      </Badge>
-    );
-  };
-
-  const handleCreateMaintenance = async (data: any) => {
-    await createMaintenanceRecord.mutateAsync({
-      equipment_name: data.item,
-      maintenance_type: 'corrective',
-      description: data.problem,
-      scheduled_date: data.startDate.toISOString().split('T')[0],
-      completed_date: data.endDate ? data.endDate.toISOString().split('T')[0] : undefined,
-      status: data.status,
-      priority: 'medium',
-    });
-
-    addActivity.mutate({
-      action: 'Création',
-      description: `Nouvelle maintenance créée pour "${data.item}"`,
-      page: 'Maintenance'
-    });
-  };
-
-  const handleEditMaintenance = async (data: any) => {
-    if (editingItem) {
-      await updateMaintenanceRecord.mutateAsync({
-        id: editingItem.id,
-        equipment_name: data.item,
-        description: data.problem,
-        scheduled_date: data.startDate.toISOString().split('T')[0],
-        completed_date: data.endDate ? data.endDate.toISOString().split('T')[0] : undefined,
-        status: data.status,
-      });
-      setEditingItem(null);
-
-      addActivity.mutate({
-        action: 'Modification',
-        description: `Maintenance modifiée pour "${data.item}"`,
-        page: 'Maintenance'
-      });
+    switch (priority) {
+      case 'critical':
+        return <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" />Critique</Badge>;
+      case 'high':
+        return <Badge className="bg-red-100 text-red-800">Haute</Badge>;
+      case 'medium':
+        return <Badge className="bg-yellow-100 text-yellow-800">Moyenne</Badge>;
+      case 'low':
+        return <Badge className="bg-green-100 text-green-800">Basse</Badge>;
+      default:
+        return <Badge variant="secondary">{priority}</Badge>;
     }
   };
 
-  const handleCloseItem = async (id: string) => {
-    const item = maintenanceRecords.find(i => i.id === id);
-    
-    if (item) {
-      // Chercher l'article correspondant dans le stock
-      const stockItem = stockItems.find(stock => 
-        stock.name === item.equipment_name && 
-        (stock.park_number === item.equipment_name || stock.serial_number === item.equipment_name)
+  const handleCompleteRecord = async (record: MaintenanceRecord) => {
+    try {
+      // Mettre à jour le record de maintenance
+      await updateMaintenanceRecord.mutateAsync({
+        id: record.id,
+        status: 'completed',
+        completed_date: new Date().toISOString().split('T')[0]
+      });
+
+      // Trouver l'article correspondant et restaurer son statut précédent
+      const relatedItem = stockItems.find(item => 
+        item.name === record.equipment_name && 
+        (item.park_number === record.equipment_name || item.serial_number === record.equipment_name)
       );
 
-      if (stockItem && stockItem.previous_status) {
-        // Remettre l'article à son état précédent
+      if (relatedItem && relatedItem.status === 'discontinued') {
+        // Restaurer le statut précédent (par défaut 'active' si pas d'info)
         await updateStockItem.mutateAsync({
-          id: stockItem.id,
-          status: stockItem.previous_status,
-          previous_status: undefined
+          id: relatedItem.id,
+          status: 'active' // ou 'inactive' selon la logique métier
         });
       }
 
-      await updateMaintenanceRecord.mutateAsync({
-        id,
-        status: 'completed',
-        completed_date: new Date().toISOString().split('T')[0],
-      });
-      
-      toast({
-        title: 'Maintenance clôturée',
-        description: `La maintenance pour ${item?.equipment_name} a été marquée comme terminée.`,
-      });
-
       addActivity.mutate({
-        action: 'Clôture',
-        description: `Maintenance clôturée pour "${item.equipment_name}"`,
+        action: 'Maintenance',
+        description: `Maintenance "${record.equipment_name}" terminée`,
         page: 'Maintenance'
       });
+    } catch (error) {
+      console.error('Erreur lors de la clôture de la maintenance:', error);
     }
   };
 
-  const handleDeleteItem = (item: MaintenanceRecord) => {
-    setDeletingItem(item);
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDelete = async () => {
-    if (deletingItem) {
-      await deleteMaintenanceRecord.mutateAsync(deletingItem.id);
-      
-      toast({
-        title: 'Maintenance supprimée',
-        description: `La maintenance pour ${deletingItem.equipment_name} a été supprimée.`,
-      });
-
-      addActivity.mutate({
-        action: 'Suppression',
-        description: `Maintenance supprimée pour "${deletingItem.equipment_name}"`,
-        page: 'Maintenance'
-      });
-      
-      setDeletingItem(null);
-      setShowDeleteDialog(false);
-    }
-  };
-
-  const openEditDialog = (item: MaintenanceRecord) => {
-    setEditingItem(item);
+  const handleEditRecord = (record: MaintenanceRecord) => {
+    setSelectedRecord(record);
     setShowDialog(true);
   };
 
-  const closeDialog = () => {
-    setShowDialog(false);
-    setEditingItem(null);
+  const handleDeleteRecord = (record: MaintenanceRecord) => {
+    setRecordToDelete(record);
+    setShowDeleteDialog(true);
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg animate-pulse">
-            <Settings className="h-8 w-8 text-white" />
-          </div>
-          <p className="text-gray-600">Chargement des maintenances...</p>
-        </div>
-      </div>
-    );
-  }
+  const totalRecords = maintenanceRecords.length;
+  const pendingRecords = maintenanceRecords.filter(r => r.status === 'scheduled' || r.status === 'in_progress').length;
+  const completedRecords = maintenanceRecords.filter(r => r.status === 'completed').length;
+
+  const groupedRecords = maintenanceRecords.reduce((acc, record) => {
+    if (!acc[record.status]) {
+      acc[record.status] = [];
+    }
+    acc[record.status].push(record);
+    return acc;
+  }, {} as Record<string, MaintenanceRecord[]>);
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Maintenance</h1>
-          <p className="text-gray-600 mt-2">Suivi des équipements en maintenance</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-orange-900 to-red-900 rounded-2xl p-8 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                <Wrench className="h-6 w-6" />
+              </div>
+              Gestion de la Maintenance
+            </h1>
+            <p className="text-orange-100">Planifiez et suivez les maintenances de vos équipements</p>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold">{totalRecords}</div>
+              <div className="text-sm text-orange-200">Total</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-300">{pendingRecords}</div>
+              <div className="text-sm text-orange-200">En cours</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-300">{completedRecords}</div>
+              <div className="text-sm text-orange-200">Terminées</div>
+            </div>
+          </div>
         </div>
-        <Button onClick={() => setShowDialog(true)}>
+      </div>
+
+      {/* Bouton d'ajout */}
+      <div className="flex justify-end">
+        <Button onClick={() => {
+          setSelectedRecord(null);
+          setShowDialog(true);
+        }}>
           <Plus className="h-4 w-4 mr-2" />
           Nouvelle maintenance
         </Button>
       </div>
 
-      <div className="grid gap-4">
-        {maintenanceRecords.map((item) => (
-          <Card key={item.id} className="shadow-lg">
+      {/* Liste des maintenances groupées par statut */}
+      <div className="space-y-6">
+        {Object.entries(groupedRecords).map(([status, records]) => (
+          <Card key={status}>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    {item.equipment_name}
-                    {getPriorityBadge(item.priority)}
-                  </CardTitle>
-                  <CardDescription>{item.maintenance_type} - {item.description}</CardDescription>
-                </div>
-                {getStatusBadge(item.status)}
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                {getStatusBadge(status)}
+                <span className="text-lg">
+                  {status === 'scheduled' && 'Maintenances Planifiées'}
+                  {status === 'in_progress' && 'Maintenances en Cours'}
+                  {status === 'completed' && 'Maintenances Terminées'}
+                  {status === 'cancelled' && 'Maintenances Annulées'}
+                </span>
+                <Badge variant="outline">{records.length}</Badge>
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm font-medium flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Date prévue
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(item.scheduled_date).toLocaleDateString('fr-FR')}
-                  </p>
-                </div>
-                {item.completed_date && (
-                  <div>
-                    <p className="text-sm font-medium flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Date de fin
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(item.completed_date).toLocaleDateString('fr-FR')}
-                    </p>
+              <div className="grid gap-4">
+                {records.map((record) => (
+                  <div key={record.id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-semibold text-lg">{record.equipment_name}</h3>
+                        {getPriorityBadge(record.priority)}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {record.status !== 'completed' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCompleteRecord(record)}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Clôturer
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditRecord(record)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteRecord(record)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <p className="text-gray-600 mb-3">{record.description}</p>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Type:</span>
+                        <p className="capitalize">{record.maintenance_type}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Date prévue:</span>
+                        <p>{new Date(record.scheduled_date).toLocaleDateString('fr-FR')}</p>
+                      </div>
+                      {record.completed_date && (
+                        <div>
+                          <span className="font-medium">Date réalisée:</span>
+                          <p>{new Date(record.completed_date).toLocaleDateString('fr-FR')}</p>
+                        </div>
+                      )}
+                      {record.cost && (
+                        <div>
+                          <span className="font-medium">Coût:</span>
+                          <p>{record.cost}€</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {record.notes && (
+                      <div className="mt-3 p-3 bg-gray-50 rounded">
+                        <span className="font-medium">Notes:</span>
+                        <p className="text-sm text-gray-600 mt-1">{record.notes}</p>
+                      </div>
+                    )}
                   </div>
-                )}
-                {item.cost && (
-                  <div>
-                    <p className="text-sm font-medium">Coût</p>
-                    <p className="text-sm text-muted-foreground">{item.cost}€</p>
-                  </div>
-                )}
-              </div>
-              {item.notes && (
-                <div className="mt-4">
-                  <p className="text-sm font-medium">Notes</p>
-                  <p className="text-sm text-muted-foreground">{item.notes}</p>
-                </div>
-              )}
-              <div className="flex gap-2 mt-4">
-                <Button variant="outline" size="sm" onClick={() => openEditDialog(item)}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Modifier
-                </Button>
-                {item.status !== 'completed' && (
-                  <Button variant="outline" size="sm" onClick={() => handleCloseItem(item.id)}>
-                    Clôturer
-                  </Button>
-                )}
-                {hasPermission('admin') && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleDeleteItem(item)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+                ))}
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
+      {maintenanceRecords.length === 0 && (
+        <div className="text-center py-12">
+          <Wrench className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Aucune maintenance enregistrée</h3>
+          <p className="text-gray-600 mb-4">Commencez par planifier une maintenance pour vos équipements.</p>
+          <Button onClick={() => setShowDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Créer une maintenance
+          </Button>
+        </div>
+      )}
+
+      {/* Dialogs */}
       <MaintenanceDialog
         isOpen={showDialog}
-        onClose={closeDialog}
-        onSubmit={editingItem ? handleEditMaintenance : handleCreateMaintenance}
-        initialData={editingItem ? {
-          id: editingItem.id,
-          item: editingItem.equipment_name,
-          category: 'Équipement',
-          problem: editingItem.description,
-          technician: 'À assigner',
-          startDate: new Date(editingItem.scheduled_date),
-          endDate: editingItem.completed_date ? new Date(editingItem.completed_date) : undefined,
-          status: editingItem.status as 'scheduled' | 'in_progress' | 'completed',
-        } : undefined}
-        mode={editingItem ? 'edit' : 'create'}
+        onClose={() => {
+          setShowDialog(false);
+          setSelectedRecord(null);
+        }}
+        record={selectedRecord}
       />
 
       <MaintenanceDeleteDialog
         isOpen={showDeleteDialog}
         onClose={() => {
           setShowDeleteDialog(false);
-          setDeletingItem(null);
+          setRecordToDelete(null);
         }}
-        onConfirm={confirmDelete}
-        itemName={deletingItem?.equipment_name || ''}
+        record={recordToDelete}
       />
     </div>
   );
