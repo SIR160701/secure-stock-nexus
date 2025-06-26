@@ -15,28 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    if (!openAIApiKey) {
-      console.error('OpenAI API key not found');
-      return new Response(JSON.stringify({ 
-        error: 'Configuration manquante: Clé API OpenAI non configurée' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const { messages } = await req.json();
-
-    if (!messages || !Array.isArray(messages)) {
-      return new Response(JSON.stringify({ 
-        error: 'Format de message invalide' 
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log('Sending request to OpenAI with messages:', messages.length);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -45,7 +24,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         messages: [
           { 
             role: 'system', 
@@ -53,35 +32,24 @@ serve(async (req) => {
           },
           ...messages
         ],
-        max_tokens: 1500,
+        max_tokens: 1000,
         temperature: 0.7,
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`OpenAI API error: ${response.status} - ${errorText}`);
-      return new Response(JSON.stringify({ 
-        error: `Erreur API OpenAI: ${response.status}` 
-      }), {
-        status: response.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || 'Désolé, je n\'ai pas pu générer une réponse.';
-
-    console.log('Successfully generated response');
+    const content = data.choices[0]?.message?.content || 'Désolé, je n\'ai pas pu générer une réponse.';
 
     return new Response(JSON.stringify({ content }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     console.error('Error in chat-gpt function:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Erreur interne du serveur' 
-    }), {
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -58,7 +58,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
       name: '',
       park_number: '',
       serial_number: '',
-      category: categories.length > 0 ? categories[0].name : '',
+      category: categories[0]?.name || '',
       status: 'active',
     });
     setMaintenanceData({
@@ -73,21 +73,12 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.category) {
-      return;
-    }
-    
     try {
       const itemData = {
-        name: formData.name,
-        park_number: formData.park_number,
-        serial_number: formData.serial_number,
-        category: formData.category,
-        status: formData.status,
+        ...formData,
         sku: `SKU-${Date.now()}`,
         quantity: 1,
         description: `Article: ${formData.name}`,
-        previous_status: item?.status || 'active',
       };
 
       let savedItem;
@@ -112,6 +103,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
         });
       }
 
+      // Si le statut est "maintenance", créer un enregistrement de maintenance
       if (formData.status === 'discontinued' && maintenanceData.problem_description) {
         await createMaintenanceRecord.mutateAsync({
           equipment_name: formData.name,
@@ -232,6 +224,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
               </Select>
             </div>
 
+            {/* Champs de maintenance si statut = "maintenance" */}
             {formData.status === 'discontinued' && (
               <div className="border-t pt-4 space-y-4">
                 <h3 className="text-lg font-semibold">Informations de maintenance</h3>

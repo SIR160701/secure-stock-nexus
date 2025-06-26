@@ -4,11 +4,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
+import { Plus, Trash2, Edit } from 'lucide-react';
 import { useEmployees, Employee } from '@/hooks/useEmployees';
 import { useEquipmentAssignments } from '@/hooks/useEquipmentAssignments';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
-import { useStock } from '@/hooks/useStock';
 
 interface EmployeeDialogProps {
   isOpen: boolean;
@@ -16,91 +16,127 @@ interface EmployeeDialogProps {
   employee?: Employee | null;
 }
 
+interface EquipmentAssignmentForm {
+  id?: string;
+  equipment_name: string;
+  park_number: string;
+  serial_number: string;
+  assigned_date: string;
+  isNew?: boolean;
+}
+
 const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employee }) => {
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
-    employee_number: '',
-    email: '',
     department: '',
-    position: '',
-    phone: '',
-    hire_date: new Date().toISOString().split('T')[0],
-    equipment_name: '',
-    park_number: '',
-    serial_number: '',
   });
 
-  const { createEmployee, updateEmployee } = useEmployees();
-  const { createAssignment } = useEquipmentAssignments();
-  const { addActivity } = useActivityHistory();
-  const { stockItems, updateStockItem } = useStock();
+  const [equipments, setEquipments] = useState<EquipmentAssignmentForm[]>([
+    { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
+  ]);
 
-  // Filtrer les articles disponibles
-  const availableItems = stockItems.filter(item => item.status === 'active');
+  const { createEmployee, updateEmployee } = useEmployees();
+  const { createAssignment, updateAssignment, deleteAssignment, assignments } = useEquipmentAssignments();
+  const { addActivity } = useActivityHistory();
 
   useEffect(() => {
     if (employee) {
       setFormData({
         first_name: employee.first_name || '',
         last_name: employee.last_name || '',
-        employee_number: employee.employee_number || '',
-        email: employee.email || '',
         department: employee.department || '',
-        position: employee.position || '',
-        phone: employee.phone || '',
-        hire_date: employee.hire_date || new Date().toISOString().split('T')[0],
-        equipment_name: '',
-        park_number: '',
-        serial_number: '',
       });
+
+      // Charger les équipements existants de l'employé
+      const employeeAssignments = assignments.filter(a => a.employee_id === employee.id);
+      if (employeeAssignments.length > 0) {
+        setEquipments(employeeAssignments.map(a => ({
+          id: a.id,
+          equipment_name: a.equipment_name,
+          park_number: a.park_number,
+          serial_number: a.serial_number || '',
+          assigned_date: a.assigned_date,
+          isNew: false
+        })));
+      } else {
+        setEquipments([
+          { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
+        ]);
+      }
     } else {
       resetForm();
     }
-  }, [employee, isOpen]);
+  }, [employee, isOpen, assignments]);
 
   const resetForm = () => {
     setFormData({
       first_name: '',
       last_name: '',
-      employee_number: '',
-      email: '',
       department: '',
-      position: '',
-      phone: '',
-      hire_date: new Date().toISOString().split('T')[0],
+    });
+    setEquipments([
+      { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
+    ]);
+  };
+
+  const addEquipment = () => {
+    setEquipments([...equipments, {
       equipment_name: '',
       park_number: '',
       serial_number: '',
-    });
+      assigned_date: new Date().toISOString().split('T')[0],
+      isNew: true
+    }]);
+  };
+
+  const removeEquipment = async (index: number) => {
+    const equipment = equipments[index];
+    
+    if (equipment.id && !equipment.isNew) {
+      // Supprimer de la base de données
+      await deleteAssignment.mutateAsync(equipment.id);
+    }
+    
+    if (equipments.length > 1) {
+      setEquipments(equipments.filter((_, i) => i !== index));
+    } else {
+      // Réinitialiser le dernier équipement
+      setEquipments([
+        { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
+      ]);
+    }
+  };
+
+  const updateEquipment = (index: number, field: keyof EquipmentAssignmentForm, value: string) => {
+    const newEquipments = [...equipments];
+    newEquipments[index] = { ...newEquipments[index], [field]: value };
+    setEquipments(newEquipments);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.first_name || !formData.last_name || !formData.email) {
-      return;
-    }
-    
     try {
+      let employeeId: string;
+
+      // Données pour l'employé
       const employeeData = {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        employee_number: formData.employee_number,
-        email: formData.email,
-        department: formData.department,
-        position: formData.position,
-        phone: formData.phone,
-        hire_date: formData.hire_date,
-        status: 'active',
+        ...formData,
+        email: `${formData.first_name.toLowerCase()}.${formData.last_name.toLowerCase()}@entreprise.com`,
+        employee_number: `EMP-${Date.now()}`,
+        position: 'Employé',
+        hire_date: new Date().toISOString().split('T')[0],
+        status: 'active' as 'active' | 'inactive' | 'terminated',
+        phone: '',
       };
 
-      let savedEmployee;
       if (employee) {
-        savedEmployee = await updateEmployee.mutateAsync({
+        await updateEmployee.mutateAsync({
           id: employee.id,
           ...employeeData,
         });
+        employeeId = employee.id;
         
         addActivity.mutate({
           action: 'Modification',
@@ -108,43 +144,37 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
           page: 'Employés'
         });
       } else {
-        savedEmployee = await createEmployee.mutateAsync(employeeData);
+        const newEmployee = await createEmployee.mutateAsync(employeeData);
+        employeeId = newEmployee.id;
         
         addActivity.mutate({
           action: 'Création',
           description: `Nouvel employé "${formData.first_name} ${formData.last_name}" ajouté`,
           page: 'Employés'
         });
+      }
 
-        // Si un équipement est sélectionné, créer l'attribution
-        if (formData.equipment_name && formData.park_number) {
-          const stockItem = stockItems.find(item => 
-            item.name === formData.equipment_name && 
-            item.park_number === formData.park_number
-          );
+      // Gérer les équipements
+      for (const equipment of equipments) {
+        if (equipment.equipment_name.trim()) {
+          const assignmentData = {
+            employee_id: employeeId,
+            equipment_name: equipment.equipment_name,
+            park_number: equipment.park_number || '',
+            serial_number: equipment.serial_number || '',
+            assigned_date: equipment.assigned_date,
+            status: 'assigned',
+          };
 
-          if (stockItem) {
-            await createAssignment.mutateAsync({
-              employee_id: savedEmployee.id,
-              equipment_name: formData.equipment_name,
-              park_number: formData.park_number,
-              serial_number: formData.serial_number || '',
-              assigned_date: new Date().toISOString().split('T')[0],
-              status: 'assigned',
+          if (equipment.id && !equipment.isNew) {
+            // Mettre à jour l'équipement existant
+            await updateAssignment.mutateAsync({
+              id: equipment.id,
+              ...assignmentData,
             });
-
-            // Changer le statut de l'article à "alloué"
-            await updateStockItem.mutateAsync({
-              id: stockItem.id,
-              status: 'inactive',
-              assigned_to: savedEmployee.id,
-            });
-
-            addActivity.mutate({
-              action: 'Attribution',
-              description: `Équipement "${formData.equipment_name}" attribué à ${formData.first_name} ${formData.last_name}`,
-              page: 'Employés'
-            });
+          } else {
+            // Créer un nouvel équipement
+            await createAssignment.mutateAsync(assignmentData);
           }
         }
       }
@@ -153,37 +183,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
       onClose();
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
-    }
-  };
-
-  const getUniqueEquipmentNames = () => {
-    const names = [...new Set(availableItems.map(item => item.name))];
-    return names;
-  };
-
-  const getAvailableParkNumbers = (equipmentName: string) => {
-    return availableItems
-      .filter(item => item.name === equipmentName)
-      .map(item => item.park_number)
-      .filter(Boolean);
-  };
-
-  const getAvailableSerialNumbers = (equipmentName: string, parkNumber: string) => {
-    return availableItems
-      .filter(item => item.name === equipmentName && item.park_number === parkNumber)
-      .map(item => item.serial_number)
-      .filter(Boolean);
-  };
-
-  const handleEquipmentChange = (equipmentName: string) => {
-    setFormData({ ...formData, equipment_name: equipmentName, park_number: '', serial_number: '' });
-  };
-
-  const handleParkNumberChange = (parkNumber: string) => {
-    setFormData({ ...formData, park_number: parkNumber, serial_number: '' });
-    const availableSerials = getAvailableSerialNumbers(formData.equipment_name, parkNumber);
-    if (availableSerials.length === 1) {
-      setFormData(prev => ({ ...prev, serial_number: availableSerials[0] }));
     }
   };
 
@@ -198,12 +197,13 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         <DialogHeader>
           <DialogTitle>{employee ? 'Modifier l\'employé' : 'Nouvel employé'}</DialogTitle>
           <DialogDescription>
-            {employee ? 'Modifier les informations de l\'employé.' : 'Ajouter un nouvel employé.'}
+            {employee ? 'Modifier les informations de l\'employé et ses équipements.' : 'Ajouter un nouvel employé avec ses équipements.'}
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
+            {/* Informations de l'employé */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="first_name">Prénom *</Label>
@@ -224,130 +224,92 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                 />
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="employee_number">N° d'employé</Label>
-                <Input
-                  id="employee_number"
-                  value={formData.employee_number}
-                  onChange={(e) => setFormData({ ...formData, employee_number: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                />
-              </div>
+            
+            <div>
+              <Label htmlFor="department">Département *</Label>
+              <Input
+                id="department"
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                placeholder="Ex: Informatique, RH, Comptabilité..."
+                required
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="department">Département</Label>
-                <Input
-                  id="department"
-                  value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                />
+            {/* Section équipements */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Équipements attribués</Label>
+                <Button type="button" onClick={addEquipment} size="sm" variant="outline">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Ajouter un équipement
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="position">Poste</Label>
-                <Input
-                  id="position"
-                  value={formData.position}
-                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                />
-              </div>
+              
+              {equipments.map((equipment, index) => (
+                <Card key={index} className="p-4">
+                  <CardContent className="space-y-3 p-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        Équipement {index + 1}
+                        {equipment.id && !equipment.isNew && (
+                          <span className="text-xs text-gray-500 ml-2">(Existant)</span>
+                        )}
+                      </span>
+                      <Button
+                        type="button"
+                        onClick={() => removeEquipment(index)}
+                        size="sm"
+                        variant="ghost"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor={`equipment_name_${index}`}>Modèle de l'équipement</Label>
+                      <Input
+                        id={`equipment_name_${index}`}
+                        value={equipment.equipment_name}
+                        onChange={(e) => updateEquipment(index, 'equipment_name', e.target.value)}
+                        placeholder="Ex: Laptop Dell Latitude 5520"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label htmlFor={`park_number_${index}`}>N° de parc</Label>
+                        <Input
+                          id={`park_number_${index}`}
+                          value={equipment.park_number}
+                          onChange={(e) => updateEquipment(index, 'park_number', e.target.value)}
+                          placeholder="Ex: PC001"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`serial_number_${index}`}>N° de série</Label>
+                        <Input
+                          id={`serial_number_${index}`}
+                          value={equipment.serial_number}
+                          onChange={(e) => updateEquipment(index, 'serial_number', e.target.value)}
+                          placeholder="Ex: SN123456"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor={`assigned_date_${index}`}>Date d'attribution</Label>
+                      <Input
+                        id={`assigned_date_${index}`}
+                        type="date"
+                        value={equipment.assigned_date}
+                        onChange={(e) => updateEquipment(index, 'assigned_date', e.target.value)}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="phone">Téléphone</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="hire_date">Date d'embauche</Label>
-                <Input
-                  id="hire_date"
-                  type="date"
-                  value={formData.hire_date}
-                  onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
-                />
-              </div>
-            </div>
-
-            {!employee && (
-              <>
-                <hr className="my-4" />
-                <h3 className="text-lg font-semibold">Attribution d'équipement (optionnel)</h3>
-                
-                <div>
-                  <Label htmlFor="equipment_name">Modèle de l'équipement</Label>
-                  <Select value={formData.equipment_name} onValueChange={handleEquipmentChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un équipement" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getUniqueEquipmentNames().map((name) => (
-                        <SelectItem key={name} value={name}>
-                          {name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="park_number">N° de parc</Label>
-                    <Select 
-                      value={formData.park_number} 
-                      onValueChange={handleParkNumberChange}
-                      disabled={!formData.equipment_name}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un n° de parc" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getAvailableParkNumbers(formData.equipment_name).map((parkNumber) => (
-                          <SelectItem key={parkNumber} value={parkNumber}>
-                            {parkNumber}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="serial_number">N° de série</Label>
-                    <Select 
-                      value={formData.serial_number} 
-                      onValueChange={(value) => setFormData({ ...formData, serial_number: value })}
-                      disabled={!formData.equipment_name || !formData.park_number}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un n° de série" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getAvailableSerialNumbers(formData.equipment_name, formData.park_number).map((serialNumber) => (
-                          <SelectItem key={serialNumber} value={serialNumber}>
-                            {serialNumber}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </>
-            )}
           </div>
           
           <DialogFooter>

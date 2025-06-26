@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Edit, Trash2, Settings } from 'lucide-react';
+import { Edit, Trash2, AlertTriangle, Settings } from 'lucide-react';
 import { StockItem } from '@/hooks/useStock';
 import { StockCategory } from '@/hooks/useStockCategories';
 
@@ -15,8 +15,6 @@ interface StockCategoryTableProps {
   onDeleteItem: (id: string) => void;
   onEditThreshold: (category: StockCategory) => void;
   onDeleteCategory: (category: StockCategory) => void;
-  availableCount: number;
-  thresholdStatus: 'safe' | 'warning' | 'critical';
 }
 
 export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
@@ -25,10 +23,11 @@ export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
   onEditItem,
   onDeleteItem,
   onEditThreshold,
-  onDeleteCategory,
-  availableCount,
-  thresholdStatus
+  onDeleteCategory
 }) => {
+  const criticalItems = items.filter(item => item.quantity <= category.critical_threshold);
+  const isCritical = criticalItems.length > 0;
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
@@ -42,19 +41,8 @@ export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
     }
   };
 
-  const getThresholdBadge = (status: 'safe' | 'warning' | 'critical') => {
-    switch (status) {
-      case 'critical':
-        return <Badge className="bg-red-500 text-white">Critique</Badge>;
-      case 'warning':
-        return <Badge className="bg-yellow-500 text-white">Attention</Badge>;
-      default:
-        return <Badge className="bg-green-500 text-white">OK</Badge>;
-    }
-  };
-
   return (
-    <Card className="border-0 shadow-lg">
+    <Card className={`border-0 shadow-lg ${isCritical ? 'ring-2 ring-red-200 bg-red-50/30' : ''}`}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -62,11 +50,16 @@ export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
             <Badge variant="outline" className="text-sm">
               {items.length} article{items.length > 1 ? 's' : ''}
             </Badge>
-            {getThresholdBadge(thresholdStatus)}
+            {isCritical && (
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {criticalItems.length} critique{criticalItems.length > 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
-              Seuil critique: {category.critical_threshold} | Disponibles: {availableCount}
+              Seuil critique: {category.critical_threshold}
             </span>
             <Button
               variant="outline"
@@ -105,35 +98,42 @@ export const StockCategoryTable: React.FC<StockCategoryTableProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">
-                      {item.name}
-                    </TableCell>
-                    <TableCell>{item.park_number || '-'}</TableCell>
-                    <TableCell>{item.serial_number || '-'}</TableCell>
-                    <TableCell>{getStatusBadge(item.status)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onEditItem(item)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onDeleteItem(item.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {items.map((item) => {
+                  const itemIsCritical = item.quantity <= category.critical_threshold;
+                  
+                  return (
+                    <TableRow key={item.id} className={itemIsCritical ? 'bg-red-50' : ''}>
+                      <TableCell className="font-medium flex items-center gap-2">
+                        {item.name}
+                        {itemIsCritical && (
+                          <AlertTriangle className="h-4 w-4 text-red-500" />
+                        )}
+                      </TableCell>
+                      <TableCell>{item.park_number || '-'}</TableCell>
+                      <TableCell>{item.serial_number || '-'}</TableCell>
+                      <TableCell>{getStatusBadge(item.status)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onEditItem(item)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onDeleteItem(item.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
