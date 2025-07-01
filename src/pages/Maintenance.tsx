@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -262,8 +261,8 @@ const Maintenance = () => {
           category: '',
           problem: selectedRecord.description,
           technician: selectedRecord.technician_id || '',
-          startDate: selectedRecord.scheduled_date,
-          endDate: selectedRecord.completed_date,
+          startDate: new Date(selectedRecord.scheduled_date),
+          endDate: selectedRecord.completed_date ? new Date(selectedRecord.completed_date) : undefined,
           status: selectedRecord.status,
           parkNumber: '',
           serialNumber: '',
