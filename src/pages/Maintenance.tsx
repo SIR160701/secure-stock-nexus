@@ -58,17 +58,22 @@ const Maintenance = () => {
         completed_date: new Date().toISOString().split('T')[0]
       });
 
-      // Trouver l'article correspondant et restaurer son statut précédent
-      const relatedItem = stockItems.find(item => 
-        item.name === record.equipment_name && 
-        (item.park_number === record.equipment_name || item.serial_number === record.equipment_name)
-      );
+      // Trouver l'article correspondant dans le stock
+      const relatedItem = stockItems.find(item => {
+        const nameMatch = item.name === record.equipment_name;
+        const parkMatch = record.park_number ? item.park_number === record.park_number : true;
+        const serialMatch = record.serial_number ? item.serial_number === record.serial_number : true;
+        
+        return nameMatch && (parkMatch || serialMatch);
+      });
 
       if (relatedItem && relatedItem.status === 'discontinued') {
-        // Restaurer le statut précédent (par défaut 'active' si pas d'info)
+        // Restaurer le statut précédent stocké dans l'enregistrement de maintenance
+        const previousStatus = record.previous_status || 'active';
+        
         await updateStockItem.mutateAsync({
           id: relatedItem.id,
-          status: 'active' // ou 'inactive' selon la logique métier
+          status: previousStatus as 'active' | 'inactive' | 'discontinued'
         });
       }
 

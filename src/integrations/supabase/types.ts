@@ -147,8 +147,11 @@ export type Database = {
           id: string
           maintenance_type: string
           notes: string | null
+          park_number: string | null
+          previous_status: string | null
           priority: string | null
           scheduled_date: string
+          serial_number: string | null
           status: string | null
           technician_id: string | null
           updated_at: string | null
@@ -162,8 +165,11 @@ export type Database = {
           id?: string
           maintenance_type: string
           notes?: string | null
+          park_number?: string | null
+          previous_status?: string | null
           priority?: string | null
           scheduled_date: string
+          serial_number?: string | null
           status?: string | null
           technician_id?: string | null
           updated_at?: string | null
@@ -177,8 +183,11 @@ export type Database = {
           id?: string
           maintenance_type?: string
           notes?: string | null
+          park_number?: string | null
+          previous_status?: string | null
           priority?: string | null
           scheduled_date?: string
+          serial_number?: string | null
           status?: string | null
           technician_id?: string | null
           updated_at?: string | null

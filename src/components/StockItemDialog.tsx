@@ -207,15 +207,21 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
 
       // Gestion de la maintenance
       if (formData.status === 'discontinued' && maintenanceData.problem && maintenanceData.technician) {
+        // Sauvegarder le statut précédent de l'article
+        const previousStatus = item ? item.status : 'active';
+        
         await createMaintenanceRecord.mutateAsync({
           equipment_name: formData.name,
+          park_number: formData.park_number || '',
+          serial_number: formData.serial_number || '',
           maintenance_type: 'corrective',
           description: maintenanceData.problem,
           scheduled_date: maintenanceData.start_date,
           completed_date: maintenanceData.end_date || undefined,
-          technician_id: null, // Le technicien sera stocké comme nom dans le champ description
+          technician_id: null,
           status: maintenanceData.maintenance_status,
           priority: 'medium',
+          previous_status: previousStatus,
           notes: `Technicien assigné: ${maintenanceData.technician}`,
         });
 

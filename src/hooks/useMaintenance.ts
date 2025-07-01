@@ -6,6 +6,8 @@ import { useToast } from '@/hooks/use-toast';
 export interface MaintenanceRecord {
   id: string;
   equipment_name: string;
+  park_number?: string;
+  serial_number?: string;
   maintenance_type: 'preventive' | 'corrective' | 'emergency';
   description: string;
   scheduled_date: string;
@@ -13,6 +15,7 @@ export interface MaintenanceRecord {
   technician_id?: string;
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high' | 'critical';
+  previous_status?: string;
   cost?: number;
   notes?: string;
   created_at: string;
