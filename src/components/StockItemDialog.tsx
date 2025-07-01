@@ -213,9 +213,10 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
           description: maintenanceData.problem,
           scheduled_date: maintenanceData.start_date,
           completed_date: maintenanceData.end_date || undefined,
-          technician_id: maintenanceData.technician,
+          technician_id: null, // Le technicien sera stocké comme nom dans le champ description
           status: maintenanceData.maintenance_status,
           priority: 'medium',
+          notes: `Technicien assigné: ${maintenanceData.technician}`,
         });
 
         addActivity.mutate({
