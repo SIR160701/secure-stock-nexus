@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Package, AlertTriangle, Trash2 } from 'lucide-react';
+import { Plus, Package, AlertTriangle } from 'lucide-react';
 import { useStock } from '@/hooks/useStock';
 import { useStockCategories } from '@/hooks/useStockCategories';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
@@ -50,7 +50,7 @@ const Stock = () => {
         category,
         items: categoryItems,
         availableCount: thresholdInfo.count,
-        thresholdStatus: thresholdInfo.status
+        thresholdStatus: thresholdInfo.status as 'critical' | 'warning' | 'normal'
       };
     });
 

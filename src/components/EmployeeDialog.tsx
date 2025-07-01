@@ -37,9 +37,9 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
   ]);
 
-  const { createEmployee, updateEmployee } = useEmployees();
+  const { updateEmployee } = useEmployees();
   const { createAssignment, updateAssignment, deleteAssignment, assignments } = useEquipmentAssignments();
-  const { stockItems, createStockItem, updateStockItem } = useStock();
+  const { stockItems, updateStockItem } = useStock();
   const { addActivity } = useActivityHistory();
 
   useEffect(() => {
@@ -103,7 +103,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         (item.park_number === equipment.park_number || item.serial_number === equipment.serial_number)
       );
       
-      if (stockItem) {
+      if (stockItem && stockItem.status === 'inactive') {
         await updateStockItem.mutateAsync({
           id: stockItem.id,
           status: 'active'
@@ -129,73 +129,49 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!employee) return;
+    
     try {
-      let employeeId: string;
-
       const employeeData = {
         ...formData,
         email: `${formData.first_name.toLowerCase()}.${formData.last_name.toLowerCase()}@entreprise.com`,
-        employee_number: `EMP-${Date.now()}`,
-        position: 'Employé',
-        hire_date: new Date().toISOString().split('T')[0],
-        status: 'active' as 'active' | 'inactive' | 'terminated',
-        phone: '',
+        employee_number: employee.employee_number,
+        position: employee.position,
+        hire_date: employee.hire_date,
+        status: employee.status,
+        phone: employee.phone || '',
       };
 
-      if (employee) {
-        await updateEmployee.mutateAsync({
-          id: employee.id,
-          ...employeeData,
-        });
-        employeeId = employee.id;
-        
-        addActivity.mutate({
-          action: 'Modification',
-          description: `Employé "${formData.first_name} ${formData.last_name}" modifié`,
-          page: 'Employés'
-        });
-      } else {
-        const newEmployee = await createEmployee.mutateAsync(employeeData);
-        employeeId = newEmployee.id;
-        
-        addActivity.mutate({
-          action: 'Création',
-          description: `Nouvel employé "${formData.first_name} ${formData.last_name}" ajouté`,
-          page: 'Employés'
-        });
-      }
+      await updateEmployee.mutateAsync({
+        id: employee.id,
+        ...employeeData,
+      });
+      
+      addActivity.mutate({
+        action: 'Modification',
+        description: `Employé "${formData.first_name} ${formData.last_name}" modifié`,
+        page: 'Employés'
+      });
 
       // Gérer les équipements
       for (const equipment of equipments) {
         if (equipment.equipment_name.trim()) {
-          // Vérifier si l'article existe dans le stock
-          let stockItem = stockItems.find(item => 
+          // Vérifier si l'article existe dans le stock et est disponible
+          const stockItem = stockItems.find(item => 
             item.name === equipment.equipment_name && 
             (item.park_number === equipment.park_number || item.serial_number === equipment.serial_number)
           );
 
-          if (stockItem) {
-            // Article existe, changer son statut à "Alloué"
+          if (stockItem && stockItem.status === 'active') {
+            // Article existe et est disponible, changer son statut à "Alloué"
             await updateStockItem.mutateAsync({
               id: stockItem.id,
               status: 'inactive'
             });
-          } else {
-            // Article n'existe pas, le créer avec statut "Alloué"
-            await createStockItem.mutateAsync({
-              name: equipment.equipment_name,
-              park_number: equipment.park_number,
-              serial_number: equipment.serial_number,
-              category: 'Équipement',
-              sku: `SKU-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              quantity: 1,
-              status: 'inactive',
-              description: `Article créé depuis l'attribution à ${formData.first_name} ${formData.last_name}`,
-            });
           }
 
           const assignmentData = {
-            employee_id: employeeId,
+            employee_id: employee.id,
             equipment_name: equipment.equipment_name,
             park_number: equipment.park_number || '',
             serial_number: equipment.serial_number || '',
@@ -230,9 +206,9 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     }}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{employee ? 'Modifier l\'employé' : 'Nouvel employé'}</DialogTitle>
+          <DialogTitle>Modifier l'employé</DialogTitle>
           <DialogDescription>
-            {employee ? 'Modifier les informations de l\'employé et ses équipements.' : 'Ajouter un nouvel employé avec ses équipements.'}
+            Modifier les informations de l'employé et ses équipements.
           </DialogDescription>
         </DialogHeader>
         
@@ -352,8 +328,8 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
             }}>
               Annuler
             </Button>
-            <Button type="submit" disabled={createEmployee.isPending || updateEmployee.isPending}>
-              {employee ? 'Modifier' : 'Créer'}
+            <Button type="submit" disabled={updateEmployee.isPending}>
+              Modifier
             </Button>
           </DialogFooter>
         </form>

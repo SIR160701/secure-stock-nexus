@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useStock, StockItem } from '@/hooks/useStock';
 import { useStockCategories } from '@/hooks/useStockCategories';
 import { useEmployees } from '@/hooks/useEmployees';
+import { useEquipmentAssignments } from '@/hooks/useEquipmentAssignments';
+import { useMaintenance } from '@/hooks/useMaintenance';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
 
 interface StockItemDialogProps {
@@ -26,6 +28,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
     status: 'active' as 'active' | 'inactive' | 'discontinued',
   });
 
+  // Données pour allocation
   const [allocatedData, setAllocatedData] = useState({
     first_name: '',
     last_name: '',
@@ -33,9 +36,20 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
     assigned_date: new Date().toISOString().split('T')[0],
   });
 
-  const { createStockItem, updateStockItem } = useStock();
+  // Données pour maintenance
+  const [maintenanceData, setMaintenanceData] = useState({
+    problem: '',
+    technician: '',
+    start_date: new Date().toISOString().split('T')[0],
+    end_date: '',
+    maintenance_status: 'scheduled' as 'scheduled' | 'in_progress',
+  });
+
+  const { createStockItem, updateStockItem, stockItems } = useStock();
   const { categories } = useStockCategories();
-  const { createEmployee } = useEmployees();
+  const { createEmployee, employees, updateEmployee } = useEmployees();
+  const { createAssignment, deleteAssignment, assignments } = useEquipmentAssignments();
+  const { createMaintenanceRecord } = useMaintenance();
   const { addActivity } = useActivityHistory();
 
   useEffect(() => {
@@ -47,10 +61,31 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
         category: item.category || '',
         status: item.status || 'active',
       });
+
+      // Si l'article est alloué, récupérer les données de l'employé
+      if (item.status === 'inactive') {
+        const assignment = assignments.find(a => 
+          a.equipment_name === item.name && 
+          (a.park_number === item.park_number || a.serial_number === item.serial_number) &&
+          a.status === 'assigned'
+        );
+        
+        if (assignment) {
+          const employee = employees.find(e => e.id === assignment.employee_id);
+          if (employee) {
+            setAllocatedData({
+              first_name: employee.first_name || '',
+              last_name: employee.last_name || '',
+              department: employee.department || '',
+              assigned_date: assignment.assigned_date || new Date().toISOString().split('T')[0],
+            });
+          }
+        }
+      }
     } else {
       resetForm();
     }
-  }, [item, isOpen]);
+  }, [item, isOpen, assignments, employees]);
 
   const resetForm = () => {
     setFormData({
@@ -66,6 +101,13 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
       department: '',
       assigned_date: new Date().toISOString().split('T')[0],
     });
+    setMaintenanceData({
+      problem: '',
+      technician: '',
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: '',
+      maintenance_status: 'scheduled',
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,7 +122,22 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
       };
 
       let savedItem;
+      const previousStatus = item?.status;
+
       if (item) {
+        // Gestion des changements de statut lors de la modification
+        if (previousStatus === 'inactive' && formData.status !== 'inactive') {
+          // Supprimer l'assignation précédente
+          const oldAssignment = assignments.find(a => 
+            a.equipment_name === item.name && 
+            (a.park_number === item.park_number || a.serial_number === item.serial_number) &&
+            a.status === 'assigned'
+          );
+          if (oldAssignment) {
+            await deleteAssignment.mutateAsync(oldAssignment.id);
+          }
+        }
+
         savedItem = await updateStockItem.mutateAsync({
           id: item.id,
           ...itemData,
@@ -101,26 +158,70 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
         });
       }
 
-      // Si le statut est "Alloué", créer un employé
+      // Gestion de l'allocation
       if (formData.status === 'inactive' && allocatedData.first_name && allocatedData.last_name) {
-        const employeeData = {
-          first_name: allocatedData.first_name,
-          last_name: allocatedData.last_name,
-          department: allocatedData.department,
-          email: `${allocatedData.first_name.toLowerCase()}.${allocatedData.last_name.toLowerCase()}@entreprise.com`,
-          employee_number: `EMP-${Date.now()}`,
-          position: 'Employé',
-          hire_date: allocatedData.assigned_date,
-          status: 'active' as 'active' | 'inactive' | 'terminated',
-          phone: '',
-        };
+        // Vérifier si l'employé existe déjà
+        const existingEmployee = employees.find(emp => 
+          emp.first_name.toLowerCase() === allocatedData.first_name.toLowerCase() &&
+          emp.last_name.toLowerCase() === allocatedData.last_name.toLowerCase() &&
+          emp.department.toLowerCase() === allocatedData.department.toLowerCase()
+        );
 
-        await createEmployee.mutateAsync(employeeData);
+        let employeeId;
+        if (existingEmployee) {
+          employeeId = existingEmployee.id;
+        } else {
+          // Créer un nouvel employé
+          const employeeData = {
+            first_name: allocatedData.first_name,
+            last_name: allocatedData.last_name,
+            department: allocatedData.department,
+            email: `${allocatedData.first_name.toLowerCase()}.${allocatedData.last_name.toLowerCase()}@entreprise.com`,
+            employee_number: `EMP-${Date.now()}`,
+            position: 'Employé',
+            hire_date: allocatedData.assigned_date,
+            status: 'active' as 'active' | 'inactive' | 'terminated',
+            phone: '',
+          };
+
+          const newEmployee = await createEmployee.mutateAsync(employeeData);
+          employeeId = newEmployee.id;
+        }
+
+        // Créer l'assignation
+        await createAssignment.mutateAsync({
+          employee_id: employeeId,
+          equipment_name: formData.name,
+          park_number: formData.park_number || '',
+          serial_number: formData.serial_number || '',
+          assigned_date: allocatedData.assigned_date,
+          status: 'assigned' as 'assigned' | 'returned',
+        });
 
         addActivity.mutate({
           action: 'Attribution',
           description: `Article "${formData.name}" attribué à ${allocatedData.first_name} ${allocatedData.last_name}`,
           page: 'Employés'
+        });
+      }
+
+      // Gestion de la maintenance
+      if (formData.status === 'discontinued' && maintenanceData.problem && maintenanceData.technician) {
+        await createMaintenanceRecord.mutateAsync({
+          equipment_name: formData.name,
+          maintenance_type: 'corrective',
+          description: maintenanceData.problem,
+          scheduled_date: maintenanceData.start_date,
+          completed_date: maintenanceData.end_date || undefined,
+          technician_id: maintenanceData.technician,
+          status: maintenanceData.maintenance_status,
+          priority: 'medium',
+        });
+
+        addActivity.mutate({
+          action: 'Maintenance',
+          description: `Maintenance créée pour "${formData.name}"`,
+          page: 'Maintenance'
         });
       }
       
@@ -274,6 +375,76 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
                     onChange={(e) => setAllocatedData({ ...allocatedData, assigned_date: e.target.value })}
                     required={formData.status === 'inactive'}
                   />
+                </div>
+              </div>
+            )}
+
+            {/* Champs de maintenance si statut = "Maintenance" */}
+            {formData.status === 'discontinued' && (
+              <div className="border-t pt-4 space-y-4">
+                <h3 className="text-lg font-semibold">Informations de maintenance</h3>
+                
+                <div>
+                  <Label htmlFor="problem">Description du problème *</Label>
+                  <Textarea
+                    id="problem"
+                    value={maintenanceData.problem}
+                    onChange={(e) => setMaintenanceData({ ...maintenanceData, problem: e.target.value })}
+                    placeholder="Décrivez le problème rencontré..."
+                    required={formData.status === 'discontinued'}
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="technician">Technicien assigné *</Label>
+                  <Input
+                    id="technician"
+                    value={maintenanceData.technician}
+                    onChange={(e) => setMaintenanceData({ ...maintenanceData, technician: e.target.value })}
+                    placeholder="Nom du technicien"
+                    required={formData.status === 'discontinued'}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="start_date">Date de début *</Label>
+                    <Input
+                      id="start_date"
+                      type="date"
+                      value={maintenanceData.start_date}
+                      onChange={(e) => setMaintenanceData({ ...maintenanceData, start_date: e.target.value })}
+                      required={formData.status === 'discontinued'}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="end_date">Date de fin prévue</Label>
+                    <Input
+                      id="end_date"
+                      type="date"
+                      value={maintenanceData.end_date}
+                      onChange={(e) => setMaintenanceData({ ...maintenanceData, end_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="maintenance_status">Statut de la maintenance *</Label>
+                  <Select 
+                    value={maintenanceData.maintenance_status} 
+                    onValueChange={(value: 'scheduled' | 'in_progress') => 
+                      setMaintenanceData({ ...maintenanceData, maintenance_status: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="scheduled">Planifiée</SelectItem>
+                      <SelectItem value="in_progress">En cours</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}

@@ -15,19 +15,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { useStockCategories } from '@/hooks/useStockCategories';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
 
 const maintenanceSchema = z.object({
-  item: z.string().min(1, 'L\'équipement est requis'),
-  category: z.string().min(1, 'La catégorie est requise'),
   problem: z.string().min(1, 'Le problème est requis'),
   technician: z.string().min(1, 'Le technicien est requis'),
   startDate: z.date(),
   endDate: z.date().optional(),
   status: z.enum(['scheduled', 'in_progress', 'completed']),
-  parkNumber: z.string().optional(),
-  serialNumber: z.string().optional(),
 });
 
 type MaintenanceFormData = z.infer<typeof maintenanceSchema>;
@@ -36,7 +31,7 @@ interface MaintenanceDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: MaintenanceFormData & { id?: string }) => void;
-  initialData?: Partial<MaintenanceFormData & { id: string }>;
+  initialData?: Partial<MaintenanceFormData & { id: string; item: string; category: string; parkNumber: string; serialNumber: string }>;
   mode: 'create' | 'edit';
 }
 
@@ -48,7 +43,6 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
   mode
 }) => {
   const { toast } = useToast();
-  const { categories } = useStockCategories();
   const { addActivity } = useActivityHistory();
   
   const {
@@ -61,15 +55,11 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
   } = useForm<MaintenanceFormData>({
     resolver: zodResolver(maintenanceSchema),
     defaultValues: {
-      item: initialData?.item || '',
-      category: initialData?.category || '',
       problem: initialData?.problem || '',
       technician: initialData?.technician || '',
       startDate: initialData?.startDate ? new Date(initialData.startDate) : new Date(),
       endDate: initialData?.endDate ? new Date(initialData.endDate) : undefined,
       status: initialData?.status || 'scheduled',
-      parkNumber: initialData?.parkNumber || '',
-      serialNumber: initialData?.serialNumber || '',
     }
   });
 
@@ -81,13 +71,13 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
     
     addActivity.mutate({
       action: mode === 'create' ? 'Création' : 'Modification',
-      description: `Maintenance ${mode === 'create' ? 'créée' : 'modifiée'} pour "${data.item}"`,
+      description: `Maintenance ${mode === 'create' ? 'créée' : 'modifiée'}`,
       page: 'Maintenance'
     });
 
     toast({
       title: mode === 'create' ? 'Maintenance créée' : 'Maintenance modifiée',
-      description: `La maintenance pour ${data.item} a été ${mode === 'create' ? 'créée' : 'modifiée'} avec succès.`,
+      description: `La maintenance a été ${mode === 'create' ? 'créée' : 'modifiée'} avec succès.`,
     });
     reset();
     onClose();
@@ -104,67 +94,14 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            {mode === 'create' ? 'Nouvelle maintenance' : 'Modifier la maintenance'}
+            Modifier la maintenance
           </DialogTitle>
           <DialogDescription>
-            {mode === 'create' ? 'Créer une nouvelle entrée de maintenance' : 'Modifier les détails de la maintenance'}
+            Modifier les détails de la maintenance (seuls certains champs sont modifiables)
           </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="item">Modèle d'équipement *</Label>
-              <Input
-                id="item"
-                placeholder="Ex: Laptop Dell Latitude 5520"
-                {...register('item')}
-              />
-              {errors.item && (
-                <p className="text-sm text-red-500 mt-1">{errors.item.message}</p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="category">Catégorie *</Label>
-              <Select onValueChange={(value) => setValue('category', value)} value={watch('category')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner une catégorie" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.name}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.category && (
-                <p className="text-sm text-red-500 mt-1">{errors.category.message}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="parkNumber">N° de parc</Label>
-              <Input
-                id="parkNumber"
-                placeholder="Ex: PC001"
-                {...register('parkNumber')}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="serialNumber">N° de série</Label>
-              <Input
-                id="serialNumber"
-                placeholder="Ex: SN123456"
-                {...register('serialNumber')}
-              />
-            </div>
-          </div>
-
           <div>
             <Label htmlFor="problem">Problème / Description *</Label>
             <Textarea
@@ -266,7 +203,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
               Annuler
             </Button>
             <Button type="submit">
-              {mode === 'create' ? 'Créer' : 'Modifier'}
+              Modifier
             </Button>
           </div>
         </form>

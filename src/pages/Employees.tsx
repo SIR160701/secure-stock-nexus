@@ -1,14 +1,16 @@
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Users, Edit, Trash2 } from 'lucide-react';
+import { Users, Edit, Trash2 } from 'lucide-react';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useEquipmentAssignments } from '@/hooks/useEquipmentAssignments';
+import { useStock } from '@/hooks/useStock';
+import { useActivityHistory } from '@/hooks/useActivityHistory';
 import { EmployeeSearch } from '@/components/EmployeeSearch';
 import EmployeeDialog from '@/components/EmployeeDialog';
+import { Button } from '@/components/ui/button';
 
 const Employees = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,6 +19,8 @@ const Employees = () => {
 
   const { employees, deleteEmployee } = useEmployees();
   const { assignments } = useEquipmentAssignments();
+  const { updateStockItem, stockItems } = useStock();
+  const { addActivity } = useActivityHistory();
 
   // Filtrer les employés selon la recherche
   const filteredEmployees = employees.filter(emp => {
@@ -36,7 +40,31 @@ const Employees = () => {
 
   const handleDelete = async (id) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cet employé ?')) {
+      // Récupérer les équipements de l'employé
+      const employeeAssignments = assignments.filter(a => a.employee_id === id && a.status === 'assigned');
+      
+      // Remettre les équipements en "disponible" dans le stock
+      for (const assignment of employeeAssignments) {
+        const stockItem = stockItems.find(item => 
+          (item.park_number === assignment.park_number || item.serial_number === assignment.serial_number) &&
+          item.name === assignment.equipment_name
+        );
+        
+        if (stockItem && stockItem.status === 'inactive') {
+          await updateStockItem.mutateAsync({
+            id: stockItem.id,
+            status: 'active'
+          });
+        }
+      }
+      
       await deleteEmployee.mutateAsync(id);
+      
+      addActivity.mutate({
+        action: 'Suppression',
+        description: `Employé supprimé et équipements remis en stock`,
+        page: 'Employés'
+      });
     }
   };
 
@@ -65,19 +93,12 @@ const Employees = () => {
         </div>
       </div>
 
-      {/* Barre de recherche et bouton d'ajout */}
+      {/* Barre de recherche */}
       <div className="flex items-center gap-4">
         <EmployeeSearch 
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
         />
-        <Button onClick={() => {
-          setSelectedEmployee(null);
-          setShowEmployeeDialog(true);
-        }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nouvel employé
-        </Button>
       </div>
 
       {/* Liste des employés */}
@@ -85,7 +106,7 @@ const Employees = () => {
         <CardHeader>
           <CardTitle>Liste des employés</CardTitle>
           <CardDescription>
-            Tous les employés avec leurs équipements attribués
+            Tous les employés avec leurs équipements attribués (gérés depuis la page Stock)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -98,15 +119,9 @@ const Employees = () => {
               <p className="text-gray-600 mb-4">
                 {searchTerm 
                   ? 'Essayez de modifier votre recherche.'
-                  : 'Commencez par ajouter votre premier employé.'
+                  : 'Les employés sont créés automatiquement lors de l\'attribution d\'équipements depuis la page Stock.'
                 }
               </p>
-              {!searchTerm && (
-                <Button onClick={() => setShowEmployeeDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter un employé
-                </Button>
-              )}
             </div>
           ) : (
             <div className="rounded-md border">

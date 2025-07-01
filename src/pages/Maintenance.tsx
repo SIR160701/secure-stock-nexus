@@ -1,13 +1,14 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Wrench, Calendar, AlertTriangle, CheckCircle, Clock, Edit, Trash2 } from 'lucide-react';
+import { Wrench, Calendar, AlertTriangle, CheckCircle, Clock, Edit, Trash2 } from 'lucide-react';
 import { useMaintenance, MaintenanceRecord } from '@/hooks/useMaintenance';
 import { useStock } from '@/hooks/useStock';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
-import MaintenanceDialog from '@/components/MaintenanceDialog';
-import MaintenanceDeleteDialog from '@/components/MaintenanceDeleteDialog';
+import { MaintenanceDialog } from '@/components/MaintenanceDialog';
+import { MaintenanceDeleteDialog } from '@/components/MaintenanceDeleteDialog';
 
 const Maintenance = () => {
   const [showDialog, setShowDialog] = useState(false);
@@ -116,7 +117,7 @@ const Maintenance = () => {
               </div>
               Gestion de la Maintenance
             </h1>
-            <p className="text-orange-100">Planifiez et suivez les maintenances de vos équipements</p>
+            <p className="text-orange-100">Suivez les maintenances de vos équipements</p>
           </div>
           <div className="flex items-center gap-6">
             <div className="text-center">
@@ -133,17 +134,6 @@ const Maintenance = () => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Bouton d'ajout */}
-      <div className="flex justify-end">
-        <Button onClick={() => {
-          setSelectedRecord(null);
-          setShowDialog(true);
-        }}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nouvelle maintenance
-        </Button>
       </div>
 
       {/* Liste des maintenances groupées par statut */}
@@ -244,11 +234,7 @@ const Maintenance = () => {
         <div className="text-center py-12">
           <Wrench className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Aucune maintenance enregistrée</h3>
-          <p className="text-gray-600 mb-4">Commencez par planifier une maintenance pour vos équipements.</p>
-          <Button onClick={() => setShowDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Créer une maintenance
-          </Button>
+          <p className="text-gray-600 mb-4">Les maintenances sont créées automatiquement depuis la page Stock.</p>
         </div>
       )}
 
@@ -259,7 +245,30 @@ const Maintenance = () => {
           setShowDialog(false);
           setSelectedRecord(null);
         }}
-        record={selectedRecord}
+        onSubmit={async (data) => {
+          if (selectedRecord) {
+            await updateMaintenanceRecord.mutateAsync({
+              id: selectedRecord.id,
+              description: data.problem,
+              technician_id: data.technician,
+              scheduled_date: data.startDate.toISOString().split('T')[0],
+              completed_date: data.endDate ? data.endDate.toISOString().split('T')[0] : undefined,
+              status: data.status,
+            });
+          }
+        }}
+        initialData={selectedRecord ? {
+          item: selectedRecord.equipment_name,
+          category: '',
+          problem: selectedRecord.description,
+          technician: selectedRecord.technician_id || '',
+          startDate: selectedRecord.scheduled_date,
+          endDate: selectedRecord.completed_date,
+          status: selectedRecord.status,
+          parkNumber: '',
+          serialNumber: '',
+        } : undefined}
+        mode="edit"
       />
 
       <MaintenanceDeleteDialog
@@ -268,7 +277,10 @@ const Maintenance = () => {
           setShowDeleteDialog(false);
           setRecordToDelete(null);
         }}
-        record={recordToDelete}
+        onConfirm={async () => {
+          // Handle delete logic here
+        }}
+        itemName={recordToDelete?.equipment_name || ''}
       />
     </div>
   );
