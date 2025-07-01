@@ -22,7 +22,7 @@ const maintenanceSchema = z.object({
   technician: z.string().min(1, 'Le technicien est requis'),
   startDate: z.date(),
   endDate: z.date().optional(),
-  status: z.enum(['scheduled', 'in_progress', 'completed']),
+  status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']),
 });
 
 type MaintenanceFormData = z.infer<typeof maintenanceSchema>;
@@ -186,7 +186,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
 
           <div>
             <Label>Statut</Label>
-            <Select onValueChange={(value: 'scheduled' | 'in_progress' | 'completed') => setValue('status', value)} defaultValue={initialData?.status || 'scheduled'}>
+            <Select onValueChange={(value: 'scheduled' | 'in_progress' | 'completed' | 'cancelled') => setValue('status', value)} defaultValue={initialData?.status || 'scheduled'}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -194,6 +194,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
                 <SelectItem value="scheduled">Planifiée</SelectItem>
                 <SelectItem value="in_progress">En cours</SelectItem>
                 <SelectItem value="completed">Terminée</SelectItem>
+                <SelectItem value="cancelled">Annulée</SelectItem>
               </SelectContent>
             </Select>
           </div>
