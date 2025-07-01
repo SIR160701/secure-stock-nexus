@@ -110,7 +110,7 @@ const Stock = () => {
   return (
     <div className="space-y-6">
       {/* Header avec alertes */}
-      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-8 text-white">
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
@@ -125,13 +125,13 @@ const Stock = () => {
             {(criticalCategories.length > 0 || warningCategories.length > 0) && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {criticalCategories.map(category => (
-                  <Badge key={category.id} variant="destructive" className="flex items-center gap-1">
+                  <Badge key={category.id} variant="destructive" className="flex items-center gap-1 bg-white/20 text-white border-white/30">
                     <AlertTriangle className="h-3 w-3" />
                     {category.name} - Stock critique
                   </Badge>
                 ))}
                 {warningCategories.map(category => (
-                  <Badge key={category.id} className="bg-orange-100 text-orange-800 flex items-center gap-1">
+                  <Badge key={category.id} className="bg-white/20 text-white border-white/30 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
                     {category.name} - Réapprovisionnement requis
                   </Badge>

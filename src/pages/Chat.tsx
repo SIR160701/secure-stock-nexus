@@ -39,7 +39,7 @@ const Chat = () => {
   return (
     <div className="space-y-6 h-full flex flex-col">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-900 via-pink-900 to-indigo-900 rounded-2xl p-8 text-white">
+      <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
@@ -50,10 +50,10 @@ const Chat = () => {
             </h1>
             <p className="text-purple-100">Chatbot spécialisé en gestion de stock et d'équipements</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-sm">GPT-4 connecté</span>
-          </div>
+            <div className="flex items-center gap-3 bg-white/20 px-4 py-2 rounded-xl backdrop-blur-sm">
+              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse shadow-lg"></div>
+              <span className="text-sm font-medium">GPT-4o Enhanced connecté</span>
+            </div>
         </div>
       </div>
 

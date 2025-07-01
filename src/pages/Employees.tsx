@@ -75,7 +75,7 @@ const Employees = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-900 to-indigo-900 rounded-2xl p-8 text-white">
+      <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
@@ -102,9 +102,9 @@ const Employees = () => {
       </div>
 
       {/* Liste des employés */}
-      <Card className="border-0 shadow-lg">
-        <CardHeader>
-          <CardTitle>Liste des employés</CardTitle>
+      <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+        <CardHeader className="bg-gradient-to-r from-card via-muted/50 to-card border-b">
+          <CardTitle className="text-xl font-bold">Liste des employés</CardTitle>
           <CardDescription>
             Tous les employés avec leurs équipements attribués (gérés depuis la page Stock)
           </CardDescription>
@@ -124,7 +124,7 @@ const Employees = () => {
               </p>
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-xl border border-border/50 overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -195,7 +195,7 @@ const Employees = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDelete(employee.id)}
-                              className="text-red-600 hover:text-red-700"
+                              className="text-destructive hover:text-destructive-foreground hover:bg-destructive/10"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

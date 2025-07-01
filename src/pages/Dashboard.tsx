@@ -18,6 +18,7 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useMaintenance } from '@/hooks/useMaintenance';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
 import { ActivityCard } from '@/components/ActivityCard';
+import { useEffect } from 'react';
 
 const Dashboard = () => {
   const { stockItems } = useStock();
@@ -25,6 +26,9 @@ const Dashboard = () => {
   const { employees } = useEmployees();
   const { maintenanceRecords } = useMaintenance();
   const { activities, isLoading: activitiesLoading } = useActivityHistory();
+
+  // Données temps réel - le dashboard utilise les mêmes hooks que les autres pages
+  // Les données se mettent à jour automatiquement grâce à React Query
 
   // Données améliorées pour les graphiques de stock
   const stockByCategory = categories.map(category => {

@@ -43,7 +43,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
   const { addActivity } = useActivityHistory();
 
   useEffect(() => {
-    if (employee) {
+    if (isOpen && employee) {
       setFormData({
         first_name: employee.first_name || '',
         last_name: employee.last_name || '',
@@ -65,7 +65,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
           { equipment_name: '', park_number: '', serial_number: '', assigned_date: new Date().toISOString().split('T')[0] }
         ]);
       }
-    } else {
+    } else if (!isOpen) {
       resetForm();
     }
   }, [employee, isOpen, assignments]);

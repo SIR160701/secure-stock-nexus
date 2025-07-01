@@ -15,18 +15,18 @@ const Maintenance = () => {
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
   const [recordToDelete, setRecordToDelete] = useState<MaintenanceRecord | null>(null);
 
-  const { maintenanceRecords, updateMaintenanceRecord } = useMaintenance();
+  const { maintenanceRecords, updateMaintenanceRecord, deleteMaintenanceRecord } = useMaintenance();
   const { stockItems, updateStockItem } = useStock();
   const { addActivity } = useActivityHistory();
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return <Badge className="bg-blue-100 text-blue-800"><Calendar className="h-3 w-3 mr-1" />Planifié</Badge>;
+        return <Badge className="bg-primary-100 text-primary-800 border-primary-200"><Calendar className="h-3 w-3 mr-1" />Planifié</Badge>;
       case 'in_progress':
-        return <Badge className="bg-orange-100 text-orange-800"><Clock className="h-3 w-3 mr-1" />En cours</Badge>;
+        return <Badge className="bg-warning-100 text-warning-800 border-warning-200"><Clock className="h-3 w-3 mr-1" />En cours</Badge>;
       case 'completed':
-        return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Terminé</Badge>;
+        return <Badge className="bg-success-100 text-success-800 border-success-200"><CheckCircle className="h-3 w-3 mr-1" />Terminé</Badge>;
       case 'cancelled':
         return <Badge variant="secondary">Annulé</Badge>;
       default:
@@ -39,11 +39,11 @@ const Maintenance = () => {
       case 'critical':
         return <Badge variant="destructive"><AlertTriangle className="h-3 w-3 mr-1" />Critique</Badge>;
       case 'high':
-        return <Badge className="bg-red-100 text-red-800">Haute</Badge>;
+        return <Badge className="bg-destructive-50 text-destructive border-destructive-200">Haute</Badge>;
       case 'medium':
-        return <Badge className="bg-yellow-100 text-yellow-800">Moyenne</Badge>;
+        return <Badge className="bg-warning-50 text-warning border-warning-200">Moyenne</Badge>;
       case 'low':
-        return <Badge className="bg-green-100 text-green-800">Basse</Badge>;
+        return <Badge className="bg-success-50 text-success border-success-200">Basse</Badge>;
       default:
         return <Badge variant="secondary">{priority}</Badge>;
     }
@@ -112,7 +112,7 @@ const Maintenance = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-900 to-red-900 rounded-2xl p-8 text-white">
+      <div className="bg-gradient-to-r from-orange-600 via-red-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
@@ -143,23 +143,23 @@ const Maintenance = () => {
       {/* Liste des maintenances groupées par statut */}
       <div className="space-y-6">
         {Object.entries(groupedRecords).map(([status, records]) => (
-          <Card key={status}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card key={status} className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+            <CardHeader className="bg-gradient-to-r from-card via-muted/50 to-card border-b">
+              <CardTitle className="flex items-center gap-3">
                 {getStatusBadge(status)}
-                <span className="text-lg">
+                <span className="text-xl font-bold">
                   {status === 'scheduled' && 'Maintenances Planifiées'}
                   {status === 'in_progress' && 'Maintenances en Cours'}
                   {status === 'completed' && 'Maintenances Terminées'}
                   {status === 'cancelled' && 'Maintenances Annulées'}
                 </span>
-                <Badge variant="outline">{records.length}</Badge>
+                <Badge variant="outline" className="text-lg px-3 py-1">{records.length}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
                 {records.map((record) => (
-                  <div key={record.id} className="border rounded-lg p-4">
+                  <div key={record.id} className="border border-border/50 rounded-2xl p-6 bg-gradient-to-br from-card to-muted/30 hover:shadow-lg transition-all duration-300">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <h3 className="font-semibold text-lg">{record.equipment_name}</h3>
@@ -171,7 +171,7 @@ const Maintenance = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => handleCompleteRecord(record)}
-                            className="text-green-600 hover:text-green-700"
+                            className="bg-success-50 text-success border-success-200 hover:bg-success-100 hover:text-success-foreground"
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
                             Clôturer
@@ -188,7 +188,7 @@ const Maintenance = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteRecord(record)}
-                          className="text-red-600 hover:text-red-700"
+                          className="text-destructive hover:text-destructive-foreground hover:bg-destructive/10"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -221,9 +221,9 @@ const Maintenance = () => {
                     </div>
                     
                     {record.notes && (
-                      <div className="mt-3 p-3 bg-gray-50 rounded">
-                        <span className="font-medium">Notes:</span>
-                        <p className="text-sm text-gray-600 mt-1">{record.notes}</p>
+                      <div className="mt-4 p-4 bg-muted/50 rounded-xl border border-border/30">
+                        <span className="font-semibold text-foreground">Notes:</span>
+                        <p className="text-sm text-muted-foreground mt-2">{record.notes}</p>
                       </div>
                     )}
                   </div>
@@ -282,7 +282,16 @@ const Maintenance = () => {
           setRecordToDelete(null);
         }}
         onConfirm={async () => {
-          // Handle delete logic here
+          if (recordToDelete) {
+            await deleteMaintenanceRecord.mutateAsync(recordToDelete.id);
+            addActivity.mutate({
+              action: 'Suppression',
+              description: `Maintenance "${recordToDelete.equipment_name}" supprimée`,
+              page: 'Maintenance'
+            });
+            setShowDeleteDialog(false);
+            setRecordToDelete(null);
+          }
         }}
         itemName={recordToDelete?.equipment_name || ''}
       />

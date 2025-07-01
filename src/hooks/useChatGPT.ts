@@ -27,7 +27,7 @@ export const useChatGPT = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('chat-gpt', {
+      const { data, error } = await supabase.functions.invoke('chat-gpt-enhanced', {
         body: { 
           messages: [...messages, userMessage].map(msg => ({
             role: msg.role,
