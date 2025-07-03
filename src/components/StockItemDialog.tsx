@@ -160,7 +160,19 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
 
       // Gestion de l'allocation
       if (formData.status === 'inactive' && allocatedData.first_name && allocatedData.last_name) {
-        // Vérifier si l'employé existe déjà
+        // Si c'est une modification et que l'article était déjà alloué, supprimer l'ancienne attribution
+        if (item && item.status === 'inactive') {
+          const oldAssignment = assignments.find(a => 
+            a.equipment_name === item.name && 
+            (a.park_number === item.park_number || a.serial_number === item.serial_number) &&
+            a.status === 'assigned'
+          );
+          if (oldAssignment) {
+            await deleteAssignment.mutateAsync(oldAssignment.id);
+          }
+        }
+
+        // Vérifier si l'employé existe déjà avec les nouvelles informations
         const existingEmployee = employees.find(emp => 
           emp.first_name.toLowerCase() === allocatedData.first_name.toLowerCase() &&
           emp.last_name.toLowerCase() === allocatedData.last_name.toLowerCase() &&
@@ -188,7 +200,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
           employeeId = newEmployee.id;
         }
 
-        // Créer l'assignation
+        // Créer la nouvelle assignation
         await createAssignment.mutateAsync({
           employee_id: employeeId,
           equipment_name: formData.name,

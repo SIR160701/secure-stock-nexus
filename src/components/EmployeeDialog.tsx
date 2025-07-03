@@ -81,15 +81,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     ]);
   };
 
-  const addEquipment = () => {
-    setEquipments([...equipments, {
-      equipment_name: '',
-      park_number: '',
-      serial_number: '',
-      assigned_date: new Date().toISOString().split('T')[0],
-      isNew: true
-    }]);
-  };
 
   const removeEquipment = async (index: number) => {
     const equipment = equipments[index];
@@ -120,11 +111,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
     }
   };
 
-  const updateEquipment = (index: number, field: keyof EquipmentAssignmentForm, value: string) => {
-    const newEquipments = [...equipments];
-    newEquipments[index] = { ...newEquipments[index], [field]: value };
-    setEquipments(newEquipments);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,42 +139,7 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
         page: 'Employés'
       });
 
-      // Gérer les équipements
-      for (const equipment of equipments) {
-        if (equipment.equipment_name.trim()) {
-          // Vérifier si l'article existe dans le stock et est disponible
-          const stockItem = stockItems.find(item => 
-            item.name === equipment.equipment_name && 
-            (item.park_number === equipment.park_number || item.serial_number === equipment.serial_number)
-          );
-
-          if (stockItem && stockItem.status === 'active') {
-            // Article existe et est disponible, changer son statut à "Alloué"
-            await updateStockItem.mutateAsync({
-              id: stockItem.id,
-              status: 'inactive'
-            });
-          }
-
-          const assignmentData = {
-            employee_id: employee.id,
-            equipment_name: equipment.equipment_name,
-            park_number: equipment.park_number || '',
-            serial_number: equipment.serial_number || '',
-            assigned_date: equipment.assigned_date,
-            status: 'assigned' as 'assigned' | 'returned',
-          };
-
-          if (equipment.id && !equipment.isNew) {
-            await updateAssignment.mutateAsync({
-              id: equipment.id,
-              ...assignmentData,
-            });
-          } else {
-            await createAssignment.mutateAsync(assignmentData);
-          }
-        }
-      }
+      // Les équipements ne peuvent plus être modifiés, cette section est supprimée
       
       resetForm();
       onClose();
@@ -249,10 +200,6 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Équipements attribués</Label>
-                <Button type="button" onClick={addEquipment} size="sm" variant="outline">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Ajouter un équipement
-                </Button>
               </div>
               
               {equipments.map((equipment, index) => (
@@ -276,43 +223,40 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
                     </div>
                     
                     <div>
-                      <Label htmlFor={`equipment_name_${index}`}>Modèle de l'équipement</Label>
+                      <Label>Modèle de l'équipement</Label>
                       <Input
-                        id={`equipment_name_${index}`}
                         value={equipment.equipment_name}
-                        onChange={(e) => updateEquipment(index, 'equipment_name', e.target.value)}
-                        placeholder="Ex: Laptop Dell Latitude 5520"
+                        disabled
+                        className="bg-gray-50"
                       />
                     </div>
                     
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <Label htmlFor={`park_number_${index}`}>N° de parc</Label>
+                        <Label>N° de parc</Label>
                         <Input
-                          id={`park_number_${index}`}
                           value={equipment.park_number}
-                          onChange={(e) => updateEquipment(index, 'park_number', e.target.value)}
-                          placeholder="Ex: PC001"
+                          disabled
+                          className="bg-gray-50"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`serial_number_${index}`}>N° de série</Label>
+                        <Label>N° de série</Label>
                         <Input
-                          id={`serial_number_${index}`}
                           value={equipment.serial_number}
-                          onChange={(e) => updateEquipment(index, 'serial_number', e.target.value)}
-                          placeholder="Ex: SN123456"
+                          disabled
+                          className="bg-gray-50"
                         />
                       </div>
                     </div>
                     
                     <div>
-                      <Label htmlFor={`assigned_date_${index}`}>Date d'attribution</Label>
+                      <Label>Date d'attribution</Label>
                       <Input
-                        id={`assigned_date_${index}`}
                         type="date"
                         value={equipment.assigned_date}
-                        onChange={(e) => updateEquipment(index, 'assigned_date', e.target.value)}
+                        disabled
+                        className="bg-gray-50"
                       />
                     </div>
                   </CardContent>
