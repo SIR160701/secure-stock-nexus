@@ -64,7 +64,7 @@ const Maintenance = () => {
         const parkMatch = record.park_number ? item.park_number === record.park_number : true;
         const serialMatch = record.serial_number ? item.serial_number === record.serial_number : true;
         
-        return nameMatch && (parkMatch || serialMatch);
+        return nameMatch && parkMatch && serialMatch;
       });
 
       if (relatedItem && relatedItem.status === 'discontinued') {
