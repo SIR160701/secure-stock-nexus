@@ -54,8 +54,9 @@ const Stock = () => {
       };
     });
 
-  // Calculer les statistiques globales
+  // Calculer les statistiques globales - correction du calcul
   const totalItems = stockItems.length;
+  const availableItems = stockItems.filter(item => item.status === 'active').length;
   const criticalCategories = categories.filter(category => {
     const thresholdInfo = getCategoryThresholdStatus(category.name, category.critical_threshold);
     return thresholdInfo.status === 'critical';
@@ -143,6 +144,7 @@ const Stock = () => {
             <div className="text-center">
               <div className="text-2xl font-bold">{totalItems}</div>
               <div className="text-sm text-blue-200">Articles total</div>
+              <div className="text-xs text-blue-300">{availableItems} disponibles</div>
             </div>
             {criticalCategories.length > 0 && (
               <div className="text-center">

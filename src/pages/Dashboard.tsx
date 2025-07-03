@@ -84,12 +84,14 @@ const Dashboard = () => {
     { mois: 'Juin', stock: stockItems.length, maintenance: maintenanceRecords.length, employés: employees.length }
   ];
 
-  // Statistiques générales améliorées
-  const totalCriticalItems = stockItems.filter(item => {
-    const category = categories.find(cat => cat.name === item.category);
-    const availableCount = stockItems.filter(i => i.category === item.category && i.status === 'active').length;
-    return category && availableCount <= category.critical_threshold;
-  }).length;
+  // Statistiques générales améliorées - correction du calcul des alertes critiques
+  const criticalCategories = categories.filter(category => {
+    const availableCount = stockItems.filter(item => 
+      item.category === category.name && item.status === 'active'
+    ).length;
+    return availableCount <= category.critical_threshold;
+  });
+  const totalCriticalItems = criticalCategories.length;
 
   const activeEmployees = employees.filter(emp => emp.status === 'active').length;
   const maintenanceInProgress = maintenanceRecords.filter(m => m.status === 'in_progress').length;

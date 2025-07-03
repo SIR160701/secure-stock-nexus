@@ -53,7 +53,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
   const { addActivity } = useActivityHistory();
 
   useEffect(() => {
-    if (item) {
+    if (isOpen && item) {
       setFormData({
         name: item.name || '',
         park_number: item.park_number || '',
@@ -81,11 +81,18 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
             });
           }
         }
+      } else {
+        setAllocatedData({
+          first_name: '',
+          last_name: '',
+          department: '',
+          assigned_date: new Date().toISOString().split('T')[0],
+        });
       }
-    } else {
+    } else if (!isOpen) {
       resetForm();
     }
-  }, [item, isOpen, assignments, employees]);
+  }, [item, isOpen]);
 
   const resetForm = () => {
     setFormData({
