@@ -71,7 +71,7 @@ Format tes réponses de manière structurée et facile à comprendre.`
     const data = await response.json();
     const content = data.choices[0]?.message?.content || 'Désolé, je n\'ai pas pu générer une réponse.';
 
-    return new Response(JSON.stringify({ content }), {
+    return new Response(JSON.stringify({ reply: content }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
