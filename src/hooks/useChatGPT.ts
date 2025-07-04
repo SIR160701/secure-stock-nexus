@@ -1,5 +1,7 @@
 
 import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -12,24 +14,14 @@ export interface ChatMessage {
 
 export const useChatGPT = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const sendMessage = async (content: string) => {
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content,
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-
-    try {
+  const mutation = useMutation({
+    mutationFn: async ({ userMessage, currentMessages }: { userMessage: ChatMessage; currentMessages: ChatMessage[] }) => {
       const { data, error } = await supabase.functions.invoke('chat-gpt-enhanced', {
         body: { 
-          messages: [...messages, userMessage].map(msg => ({
+          messages: [...currentMessages, userMessage].map(msg => ({
             role: msg.role,
             content: msg.content
           }))
@@ -37,25 +29,51 @@ export const useChatGPT = () => {
       });
 
       if (error) throw error;
-
+      return data.content;
+    },
+    onMutate: async ({ userMessage }) => {
+      // Optimistic update : ajouter immédiatement le message utilisateur
+      setMessages(prev => [...prev, userMessage]);
+      return { userMessage };
+    },
+    onSuccess: (assistantContent, { userMessage }) => {
+      // Ajouter la réponse de l'assistant
       const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: uuidv4(),
         role: 'assistant',
-        content: data.content,
+        content: assistantContent,
         timestamp: new Date(),
       };
-
       setMessages(prev => [...prev, assistantMessage]);
-    } catch (error) {
+    },
+    onError: (error, variables, context) => {
       console.error('Erreur chat:', error);
+      
+      // Annuler l'optimistic update en supprimant le message utilisateur qui a échoué
+      if (context?.userMessage) {
+        setMessages(prev => prev.filter(msg => msg.id !== context.userMessage.id));
+      }
+      
       toast({
         title: "Erreur",
         description: "Impossible de communiquer avec l'assistant IA.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
-    }
+    },
+  });
+
+  const sendMessage = async (content: string) => {
+    const userMessage: ChatMessage = {
+      id: uuidv4(),
+      role: 'user',
+      content,
+      timestamp: new Date(),
+    };
+
+    mutation.mutate({ 
+      userMessage, 
+      currentMessages: messages 
+    });
   };
 
   const clearMessages = () => {
@@ -64,7 +82,7 @@ export const useChatGPT = () => {
 
   return {
     messages,
-    isLoading,
+    isLoading: mutation.isPending,
     sendMessage,
     clearMessages,
   };
