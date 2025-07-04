@@ -10,13 +10,15 @@ import {
   AlertTriangle,
   TrendingUp,
   Activity,
-  Clock
+  Clock,
+  MessageSquare
 } from 'lucide-react';
 import { useStock } from '@/hooks/useStock';
 import { useStockCategories } from '@/hooks/useStockCategories';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useMaintenance } from '@/hooks/useMaintenance';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
+import { useChatStats } from '@/hooks/useChatStats';
 import { ActivityCard } from '@/components/ActivityCard';
 import { useEffect } from 'react';
 
@@ -26,6 +28,7 @@ const Dashboard = () => {
   const { employees } = useEmployees();
   const { maintenanceRecords } = useMaintenance();
   const { activities, isLoading: activitiesLoading } = useActivityHistory();
+  const { chatStats, isLoading: chatStatsLoading } = useChatStats();
 
   // Données temps réel - le dashboard utilise les mêmes hooks que les autres pages
   // Les données se mettent à jour automatiquement grâce à React Query
@@ -226,6 +229,59 @@ const Dashboard = () => {
 
       {/* Graphiques améliorés */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Statistiques du Chat IA */}
+        <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                <MessageSquare className="h-4 w-4 text-white" />
+              </div>
+              Assistant IA - Statistiques
+            </CardTitle>
+            <CardDescription>Utilisation de l'assistant Gemini AI</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {chatStatsLoading ? (
+              <div className="space-y-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-6 bg-gray-100 rounded animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                  <span className="text-sm font-medium text-purple-700">Messages total</span>
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                    {chatStats?.total_messages || 0}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                  <span className="text-sm font-medium text-blue-700">Aujourd'hui</span>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                    {chatStats?.messages_today || 0}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                  <span className="text-sm font-medium text-green-700">Heure la plus active</span>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    {chatStats?.most_active_hour || 'N/A'}
+                  </Badge>
+                </div>
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Sujets populaires :</p>
+                  <div className="flex flex-wrap gap-2">
+                    {chatStats?.popular_topics.map((topic, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {topic}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Stock par catégorie avec utilisation */}
         <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
           <CardHeader>

@@ -19,7 +19,7 @@ export const useChatGPT = () => {
 
   const mutation = useMutation({
     mutationFn: async ({ userMessage, currentMessages }: { userMessage: ChatMessage; currentMessages: ChatMessage[] }) => {
-      const { data, error } = await supabase.functions.invoke('chat-gpt', {
+      const { data, error } = await supabase.functions.invoke('chat-gpt-enhanced', {
         body: { 
           messages: [...currentMessages, userMessage].map(msg => ({
             role: msg.role,

@@ -21,6 +21,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ activities, isLoadin
       case 'maintenance':
         return <Settings className="h-4 w-4" />;
       case 'chat':
+      case 'chat ia':
         return <MessageSquare className="h-4 w-4" />;
       default:
         return <User className="h-4 w-4" />;
@@ -36,8 +37,9 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({ activities, isLoadin
         return 'bg-blue-100 text-blue-800';
       case 'suppression':
         return 'bg-red-100 text-red-800';
-      case 'maintenance':
-        return 'bg-orange-100 text-orange-800';
+      case 'chat':
+      case 'chat ia':
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }

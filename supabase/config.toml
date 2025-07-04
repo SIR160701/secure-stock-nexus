@@ -1,1 +1,7 @@
 project_id = "qfnhztqzzlvlflsovdvk"
+
+[functions.chat-gpt]
+verify_jwt = false
+
+[functions.chat-gpt-enhanced]
+verify_jwt = false

@@ -1,7 +1,10 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
-console.log("INFO: Fonction chat-gpt-enhanced initialisée.");
+const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,92 +12,114 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log(`INFO: Requête reçue à ${new Date().toISOString()}`);
-
   if (req.method === 'OPTIONS') {
-    console.log("INFO: Réponse à une requête OPTIONS (preflight).");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Étape 1: Récupérer la clé API
-    console.log("DEBUG: Tentative de récupération de la clé API OpenAI...");
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-
-    if (!openAIApiKey) {
-      console.error("ERREUR FATALE: La variable d'environnement OPENAI_API_KEY est manquante ou vide !");
-      throw new Error('Clé API OpenAI non configurée dans les secrets Supabase.');
-    }
-    console.log("DEBUG: Clé API récupérée avec succès (vérification de présence uniquement).");
-
-    // Étape 2: Lire le corps de la requête
-    console.log("DEBUG: Lecture du corps de la requête...");
     const { messages } = await req.json();
-    if (!messages || !Array.isArray(messages)) {
-      console.error("ERREUR: Le corps de la requête est invalide ou 'messages' est manquant.");
-      throw new Error("Le corps de la requête doit contenir un tableau 'messages'.");
-    }
-    console.log(`DEBUG: Requête reçue avec ${messages.length} message(s).`);
-
-    // Étape 3: Définir le prompt système
-    const systemPrompt = {
-      role: 'system',
-      content: `Tu es un assistant IA expert en gestion de stock et d'équipements pour entreprises. 
-
-Tu es spécialisé dans :
-- Gestion et optimisation du stock et des inventaires
-- Maintenance préventive et corrective des équipements
-- Attribution et suivi des équipements aux employés
-- Procédures de sécurité et bonnes pratiques
-- Analyse de performance et de rentabilité
-- Stratégies d'approvisionnement et de réapprovisionnement
-- Organisation et planification des ressources
-
-Tu dois :
-- Répondre TOUJOURS en français
-- Être professionnel, précis et pratique
-- Donner des conseils concrets et applicables
-- Proposer des solutions step-by-step quand c'est approprié
-- Utiliser ton expertise pour aider à résoudre les problèmes de gestion
-- Adapter tes réponses au contexte d'une PME/grande entreprise
-
-Format tes réponses de manière structurée et facile à comprendre.`
-    };
     
-    // Étape 4: Envoyer la requête à OpenAI
-    console.log("DEBUG: Envoi de la requête à l'API OpenAI...");
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Initialize Supabase client
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Fetch current data from all relevant tables
+    const [stockData, employeesData, maintenanceData, categoriesData, activitiesData] = await Promise.all([
+      supabase.from('stock_items').select('*').limit(50),
+      supabase.from('employees').select('*').limit(50),
+      supabase.from('maintenance_records').select('*').limit(50),
+      supabase.from('stock_categories').select('*'),
+      supabase.from('activity_history').select('*').order('created_at', { ascending: false }).limit(20)
+    ]);
+
+    // Prepare context data for the AI
+    const contextData = {
+      stock: stockData.data || [],
+      employees: employeesData.data || [],
+      maintenance: maintenanceData.data || [],
+      categories: categoriesData.data || [],
+      recent_activities: activitiesData.data || []
+    };
+
+    // Enhanced system prompt with access to data and capabilities
+    const systemPrompt = `Tu es un assistant IA spécialisé dans la gestion de stock et d'équipements avec accès complet aux données de l'entreprise. Tu peux consulter et analyser les données en temps réel.
+
+DONNÉES ACTUELLES DISPONIBLES :
+- Stock: ${contextData.stock.length} articles
+- Employés: ${contextData.employees.length} personnes
+- Maintenances: ${contextData.maintenance.length} interventions
+- Catégories: ${contextData.categories.length} catégories
+- Activités récentes: ${contextData.recent_activities.length} actions
+
+CAPACITÉS :
+- Analyser les tendances et statistiques
+- Identifier les problèmes critiques (stock bas, maintenances en retard)
+- Donner des recommandations basées sur les données réelles
+- Expliquer les processus de gestion
+- Répondre aux questions sur l'état actuel du système
+
+INSTRUCTIONS :
+- Réponds toujours en français de manière professionnelle
+- Base tes réponses sur les données réelles fournies
+- Identifie les alertes critiques si elles existent
+- Propose des actions concrètes quand c'est pertinent
+- Sois précis dans tes analyses statistiques`;
+
+    const contents = [];
+    
+    // Add system prompt and context
+    contents.push({
+      role: 'user',
+      parts: [{ 
+        text: `${systemPrompt}\n\nCONTEXTE DONNÉES ACTUELLES:\n${JSON.stringify(contextData, null, 2)}`
+      }]
+    });
+    contents.push({
+      role: 'model',
+      parts: [{ text: 'Je suis connecté à vos données en temps réel. Je peux analyser votre stock, vos équipements, votre équipe et vos maintenances. Comment puis-je vous aider à optimiser votre gestion ?' }]
+    });
+
+    // Transform messages: 'user' stays 'user', 'assistant' becomes 'model'
+    messages.forEach(msg => {
+      contents.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      });
+    });
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${googleApiKey}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [systemPrompt, ...messages],
-        max_tokens: 2000,
+        contents: contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2000,
+        }
       }),
     });
-    console.log(`DEBUG: Réponse reçue d'OpenAI avec le statut: ${response.status}`);
 
-    // Étape 5: Gérer la réponse d'OpenAI
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error(`ERREUR OPENAI: Statut ${response.status}. Réponse: ${errorData}`);
-      throw new Error(`Erreur API OpenAI: ${response.status} - ${response.statusText}`);
+      throw new Error(`Google Gemini API error: ${response.status} - ${response.statusText}`);
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content || 'Désolé, je n\'ai pas pu générer une réponse.';
-    console.log("INFO: Réponse générée avec succès.");
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Désolé, je n\'ai pas pu générer une réponse.';
 
-    // Étape 6: Renvoyer la réponse au client
-    return new Response(JSON.stringify({ content: content }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // Log chat activity to database
+    await supabase.from('activity_history').insert({
+      action: 'Chat IA',
+      description: `Consultation de l'assistant IA - Question posée`,
+      page: 'Chat',
+      user_id: 'system'
     });
 
+    return new Response(JSON.stringify({ content }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error) {
-    console.error('ERREUR DANS LE BLOC CATCH:', error);
+    console.error('Error in chat-gpt-enhanced function:', error);
     return new Response(JSON.stringify({ 
       error: 'Erreur de connexion au service IA',
       details: error.message 
