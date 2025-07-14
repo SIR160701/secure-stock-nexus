@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,16 +6,55 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
-import { Users, Shield, Database, Bot, Palette, Download } from 'lucide-react';
+import { Users, Shield, Database, Bot, Palette, Download, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useUsers } from '@/hooks/useUsers';
+import { useToast } from '@/hooks/use-toast';
 
 const Settings = () => {
   const { user, hasPermission } = useAuth();
+  const { users, isLoading, createUser, deleteUser } = useUsers();
+  const { toast } = useToast();
+  
+  const [newUser, setNewUser] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    role: 'user'
+  });
 
-  // DEBUG: Affichage temporaire du contexte utilisateur
-  console.log('user:', user);
-  console.log('hasPermission:', hasPermission);
+  const handleCreateUser = async () => {
+    if (!newUser.fullName || !newUser.email || !newUser.password) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs requis.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createUser.mutate({
+      email: newUser.email,
+      password: newUser.password,
+      full_name: newUser.fullName,
+      role: newUser.role
+    });
+
+    // Reset form
+    setNewUser({
+      fullName: '',
+      email: '',
+      password: '',
+      role: 'user'
+    });
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
+      deleteUser.mutate(userId);
+    }
+  };
 
   // Désactive temporairement la restriction admin pour diagnostic
   // if (!hasPermission('admin')) {
@@ -52,21 +91,38 @@ const Settings = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="new-user-name">Nom complet</Label>
-              <Input id="new-user-name" placeholder="Nom complet" />
+              <Input 
+                id="new-user-name" 
+                placeholder="Nom complet" 
+                value={newUser.fullName}
+                onChange={(e) => setNewUser(prev => ({ ...prev, fullName: e.target.value }))}
+              />
             </div>
             <div>
               <Label htmlFor="new-user-email">Email</Label>
-              <Input id="new-user-email" type="email" placeholder="email@exemple.com" />
+              <Input 
+                id="new-user-email" 
+                type="email" 
+                placeholder="email@exemple.com" 
+                value={newUser.email}
+                onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+              />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="new-user-password">Mot de passe</Label>
-              <Input id="new-user-password" type="password" placeholder="Mot de passe" />
+              <Input 
+                id="new-user-password" 
+                type="password" 
+                placeholder="Mot de passe" 
+                value={newUser.password}
+                onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+              />
             </div>
             <div>
               <Label htmlFor="new-user-role">Rôle</Label>
-              <Select>
+              <Select value={newUser.role} onValueChange={(value) => setNewUser(prev => ({ ...prev, role: value }))}>
                 <SelectTrigger id="new-user-role">
                   <SelectValue placeholder="Sélectionner un rôle" />
                 </SelectTrigger>
@@ -77,7 +133,12 @@ const Settings = () => {
               </Select>
             </div>
           </div>
-          <Button>Ajouter un utilisateur</Button>
+          <Button 
+            onClick={handleCreateUser} 
+            disabled={createUser.isPending}
+          >
+            {createUser.isPending ? 'Création...' : 'Ajouter un utilisateur'}
+          </Button>
           
           {/* Liste des utilisateurs */}
           <div className="mt-6">
@@ -91,17 +152,36 @@ const Settings = () => {
                   <div>Actions</div>
                 </div>
               </div>
-              <div className="p-4">
-                <div className="grid grid-cols-4 gap-4 items-center">
-                  <div>Admin System</div>
-                  <div>admin@securestock.com</div>
-                  <div><Badge>Administrateur</Badge></div>
-                  <div>
-                    <Button variant="ghost" size="sm">Modifier</Button>
-                    <Button variant="ghost" size="sm" className="text-destructive">Supprimer</Button>
+              {isLoading ? (
+                <div className="p-4 text-center">Chargement...</div>
+              ) : users.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">Aucun utilisateur trouvé</div>
+              ) : (
+                users.map((user) => (
+                  <div key={user.id} className="p-4 border-b last:border-b-0">
+                    <div className="grid grid-cols-4 gap-4 items-center">
+                      <div>{user.full_name || 'Non défini'}</div>
+                      <div>{user.email}</div>
+                      <div>
+                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                          {user.role === 'admin' ? 'Administrateur' : 'Utilisateur'}
+                        </Badge>
+                      </div>
+                      <div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-destructive"
+                          onClick={() => handleDeleteUser(user.id)}
+                          disabled={deleteUser.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                ))
+              )}
             </div>
           </div>
         </CardContent>

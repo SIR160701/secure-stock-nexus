@@ -68,6 +68,17 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
   const startDate = watch('startDate');
   const endDate = watch('endDate');
 
+  useEffect(() => {
+    if (initialData) {
+      setValue('problem', initialData.problem || '');
+      setValue('technician', initialData.technician || '');
+      setValue('startDate', initialData.startDate ? new Date(initialData.startDate) : new Date());
+      setValue('endDate', initialData.endDate ? new Date(initialData.endDate) : undefined);
+      setValue('status', initialData.status || 'scheduled');
+      setValue('priority', initialData.priority || 'medium');
+    }
+  }, [initialData, setValue]);
+
   const handleFormSubmit = async (data: MaintenanceFormData) => {
     onSubmit({ ...data, id: initialData?.id });
     
