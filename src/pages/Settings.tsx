@@ -7,6 +7,8 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { Users, Shield, Database, Bot, Palette, Download } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Settings = () => {
   const { user, hasPermission } = useAuth();
@@ -49,7 +51,7 @@ const Settings = () => {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="new-user-name">Nom d'utilisateur</Label>
+              <Label htmlFor="new-user-name">Nom complet</Label>
               <Input id="new-user-name" placeholder="Nom complet" />
             </div>
             <div>
@@ -57,7 +59,51 @@ const Settings = () => {
               <Input id="new-user-email" type="email" placeholder="email@exemple.com" />
             </div>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="new-user-password">Mot de passe</Label>
+              <Input id="new-user-password" type="password" placeholder="Mot de passe" />
+            </div>
+            <div>
+              <Label htmlFor="new-user-role">Rôle</Label>
+              <Select>
+                <SelectTrigger id="new-user-role">
+                  <SelectValue placeholder="Sélectionner un rôle" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">Utilisateur</SelectItem>
+                  <SelectItem value="admin">Administrateur</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <Button>Ajouter un utilisateur</Button>
+          
+          {/* Liste des utilisateurs */}
+          <div className="mt-6">
+            <h4 className="text-lg font-medium mb-4">Utilisateurs existants</h4>
+            <div className="border rounded-lg">
+              <div className="p-4 border-b bg-muted/50">
+                <div className="grid grid-cols-4 gap-4 font-medium">
+                  <div>Nom</div>
+                  <div>Email</div>
+                  <div>Rôle</div>
+                  <div>Actions</div>
+                </div>
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-4 gap-4 items-center">
+                  <div>Admin System</div>
+                  <div>admin@securestock.com</div>
+                  <div><Badge>Administrateur</Badge></div>
+                  <div>
+                    <Button variant="ghost" size="sm">Modifier</Button>
+                    <Button variant="ghost" size="sm" className="text-destructive">Supprimer</Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

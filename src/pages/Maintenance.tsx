@@ -177,13 +177,15 @@ const Maintenance = () => {
                             Clôturer
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditRecord(record)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        {record.status !== 'completed' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditRecord(record)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -258,6 +260,7 @@ const Maintenance = () => {
               scheduled_date: data.startDate.toISOString().split('T')[0],
               completed_date: data.endDate ? data.endDate.toISOString().split('T')[0] : undefined,
               status: data.status,
+              priority: data.priority,
             });
           }
         }}
@@ -269,6 +272,7 @@ const Maintenance = () => {
           startDate: new Date(selectedRecord.scheduled_date),
           endDate: selectedRecord.completed_date ? new Date(selectedRecord.completed_date) : undefined,
           status: selectedRecord.status,
+          priority: selectedRecord.priority === 'critical' ? 'high' : selectedRecord.priority as 'low' | 'medium' | 'high',
           parkNumber: '',
           serialNumber: '',
         } : undefined}

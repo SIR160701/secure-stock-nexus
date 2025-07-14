@@ -43,6 +43,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
     start_date: new Date().toISOString().split('T')[0],
     end_date: '',
     maintenance_status: 'scheduled' as 'scheduled' | 'in_progress',
+    priority: 'medium' as 'low' | 'medium' | 'high',
   });
 
   const { createStockItem, updateStockItem, stockItems } = useStock();
@@ -114,6 +115,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
       start_date: new Date().toISOString().split('T')[0],
       end_date: '',
       maintenance_status: 'scheduled',
+      priority: 'medium',
     });
   };
 
@@ -239,7 +241,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
           completed_date: maintenanceData.end_date || undefined,
           technician_id: null,
           status: maintenanceData.maintenance_status,
-          priority: 'medium',
+          priority: maintenanceData.priority,
           previous_status: previousStatus,
           notes: `Technicien assigné: ${maintenanceData.technician}`,
         });
@@ -453,6 +455,25 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
                       onChange={(e) => setMaintenanceData({ ...maintenanceData, end_date: e.target.value })}
                     />
                   </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="priority">Priorité *</Label>
+                  <Select 
+                    value={maintenanceData.priority} 
+                    onValueChange={(value: 'low' | 'medium' | 'high') => 
+                      setMaintenanceData({ ...maintenanceData, priority: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Basse</SelectItem>
+                      <SelectItem value="medium">Moyenne</SelectItem>
+                      <SelectItem value="high">Haute</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>

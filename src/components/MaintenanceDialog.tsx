@@ -23,6 +23,7 @@ const maintenanceSchema = z.object({
   startDate: z.date(),
   endDate: z.date().optional(),
   status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']),
+  priority: z.enum(['low', 'medium', 'high']),
 });
 
 type MaintenanceFormData = z.infer<typeof maintenanceSchema>;
@@ -60,6 +61,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
       startDate: initialData?.startDate ? new Date(initialData.startDate) : new Date(),
       endDate: initialData?.endDate ? new Date(initialData.endDate) : undefined,
       status: initialData?.status || 'scheduled',
+      priority: initialData?.priority || 'medium',
     }
   });
 
@@ -195,6 +197,20 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
                 <SelectItem value="in_progress">En cours</SelectItem>
                 <SelectItem value="completed">Terminée</SelectItem>
                 <SelectItem value="cancelled">Annulée</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Priorité</Label>
+            <Select onValueChange={(value: 'low' | 'medium' | 'high') => setValue('priority', value)} defaultValue={initialData?.priority || 'medium'}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Basse</SelectItem>
+                <SelectItem value="medium">Moyenne</SelectItem>
+                <SelectItem value="high">Haute</SelectItem>
               </SelectContent>
             </Select>
           </div>
