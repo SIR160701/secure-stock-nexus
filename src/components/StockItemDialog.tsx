@@ -12,6 +12,8 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useEquipmentAssignments } from '@/hooks/useEquipmentAssignments';
 import { useMaintenance } from '@/hooks/useMaintenance';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
+import { useUsers } from '@/hooks/useUsers';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StockItemDialogProps {
   isOpen: boolean;
@@ -52,6 +54,7 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
   const { createAssignment, deleteAssignment, assignments } = useEquipmentAssignments();
   const { createMaintenanceRecord } = useMaintenance();
   const { addActivity } = useActivityHistory();
+  const { users } = useUsers();
 
   useEffect(() => {
     if (isOpen && item) {
@@ -239,12 +242,33 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
           description: maintenanceData.problem,
           scheduled_date: maintenanceData.start_date,
           completed_date: maintenanceData.end_date || undefined,
-          technician_id: null,
+          technician_id: maintenanceData.technician,
           status: maintenanceData.maintenance_status,
           priority: maintenanceData.priority,
           previous_status: previousStatus,
-          notes: `Technicien assigné: ${maintenanceData.technician}`,
+          notes: `Maintenance créée depuis l'interface stock`,
         });
+
+        // Envoyer un email au technicien
+        const selectedUser = users.find(u => u.id === maintenanceData.technician);
+        if (selectedUser && selectedUser.email) {
+          try {
+            await supabase.functions.invoke('send-maintenance-email', {
+              body: {
+                technicianEmail: selectedUser.email,
+                technicianName: selectedUser.full_name || selectedUser.email,
+                equipmentName: formData.name,
+                parkNumber: formData.park_number || '',
+                serialNumber: formData.serial_number || '',
+                description: maintenanceData.problem,
+                priority: maintenanceData.priority,
+                scheduledDate: maintenanceData.start_date
+              }
+            });
+          } catch (emailError) {
+            console.error('Erreur lors de l\'envoi de l\'email:', emailError);
+          }
+        }
 
         addActivity.mutate({
           action: 'Maintenance',
@@ -360,27 +384,35 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
               <div className="border-t pt-4 space-y-4">
                 <h3 className="text-lg font-semibold">Informations d'attribution</h3>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="first_name">Prénom *</Label>
-                    <Input
-                      id="first_name"
-                      value={allocatedData.first_name}
-                      onChange={(e) => setAllocatedData({ ...allocatedData, first_name: e.target.value })}
-                      placeholder="Prénom de la personne"
-                      required={formData.status === 'inactive'}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="last_name">Nom *</Label>
-                    <Input
-                      id="last_name"
-                      value={allocatedData.last_name}
-                      onChange={(e) => setAllocatedData({ ...allocatedData, last_name: e.target.value })}
-                      placeholder="Nom de la personne"
-                      required={formData.status === 'inactive'}
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="employee_select">Employé *</Label>
+                  <Select 
+                    value={allocatedData.first_name && allocatedData.last_name ? 
+                      employees.find(e => e.first_name === allocatedData.first_name && e.last_name === allocatedData.last_name)?.id || '' : ''} 
+                    onValueChange={(value) => {
+                      const selectedEmployee = employees.find(e => e.id === value);
+                      if (selectedEmployee) {
+                        setAllocatedData({ 
+                          ...allocatedData, 
+                          first_name: selectedEmployee.first_name, 
+                          last_name: selectedEmployee.last_name,
+                          department: selectedEmployee.department
+                        });
+                      }
+                    }}
+                    required={formData.status === 'inactive'}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un employé" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.map((employee) => (
+                        <SelectItem key={employee.id} value={employee.id}>
+                          {employee.first_name} {employee.last_name} - {employee.department}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -426,13 +458,22 @@ const StockItemDialog: React.FC<StockItemDialogProps> = ({ isOpen, onClose, item
 
                 <div>
                   <Label htmlFor="technician">Technicien assigné *</Label>
-                  <Input
-                    id="technician"
-                    value={maintenanceData.technician}
-                    onChange={(e) => setMaintenanceData({ ...maintenanceData, technician: e.target.value })}
-                    placeholder="Nom du technicien"
+                  <Select 
+                    value={maintenanceData.technician} 
+                    onValueChange={(value) => setMaintenanceData({ ...maintenanceData, technician: value })}
                     required={formData.status === 'discontinued'}
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un technicien" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.full_name || user.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

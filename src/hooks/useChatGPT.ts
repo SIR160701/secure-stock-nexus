@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +16,30 @@ export const useChatGPT = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Charger les messages depuis localStorage au démarrage
+  useEffect(() => {
+    const savedMessages = localStorage.getItem('chat_messages');
+    if (savedMessages) {
+      try {
+        const parsed = JSON.parse(savedMessages);
+        const messagesWithDateObjects = parsed.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }));
+        setMessages(messagesWithDateObjects);
+      } catch (error) {
+        console.error('Erreur lors du chargement des messages:', error);
+      }
+    }
+  }, []);
+
+  // Sauvegarder les messages dans localStorage à chaque changement
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('chat_messages', JSON.stringify(messages));
+    }
+  }, [messages]);
 
   const mutation = useMutation({
     mutationFn: async ({ userMessage, currentMessages }: { userMessage: ChatMessage; currentMessages: ChatMessage[] }) => {
@@ -78,6 +102,7 @@ export const useChatGPT = () => {
 
   const clearMessages = () => {
     setMessages([]);
+    localStorage.removeItem('chat_messages');
   };
 
   return {

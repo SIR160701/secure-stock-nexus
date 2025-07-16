@@ -10,11 +10,13 @@ import { Users, Shield, Database, Bot, Palette, Download, Trash2 } from 'lucide-
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useUsers } from '@/hooks/useUsers';
+import { useEmployees } from '@/hooks/useEmployees';
 import { useToast } from '@/hooks/use-toast';
 
 const Settings = () => {
   const { user, hasPermission } = useAuth();
   const { users, isLoading, createUser, deleteUser } = useUsers();
+  const { employees, createEmployee } = useEmployees();
   const { toast } = useToast();
   
   const [newUser, setNewUser] = useState({
@@ -22,6 +24,15 @@ const Settings = () => {
     email: '',
     password: '',
     role: 'user'
+  });
+
+  const [newEmployee, setNewEmployee] = useState({
+    first_name: '',
+    last_name: '',
+    department: '',
+    position: '',
+    email: '',
+    phone: ''
   });
 
   const handleCreateUser = async () => {
@@ -54,6 +65,38 @@ const Settings = () => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
       deleteUser.mutate(userId);
     }
+  };
+
+  const handleCreateEmployee = async () => {
+    if (!newEmployee.first_name || !newEmployee.last_name || !newEmployee.department) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs requis (nom, prénom, département).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const employeeData = {
+      ...newEmployee,
+      employee_number: `EMP-${Date.now()}`,
+      email: newEmployee.email || `${newEmployee.first_name.toLowerCase()}.${newEmployee.last_name.toLowerCase()}@entreprise.com`,
+      position: newEmployee.position || 'Employé',
+      hire_date: new Date().toISOString().split('T')[0],
+      status: 'active' as const
+    };
+
+    createEmployee.mutate(employeeData);
+
+    // Reset form
+    setNewEmployee({
+      first_name: '',
+      last_name: '',
+      department: '',
+      position: '',
+      email: '',
+      phone: ''
+    });
   };
 
   // Désactive temporairement la restriction admin pour diagnostic
@@ -184,6 +227,98 @@ const Settings = () => {
               )}
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Gestion des employés */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Users className="h-5 w-5" />
+            <span>Gestion des employés</span>
+          </CardTitle>
+          <CardDescription>
+            Ajoutez de nouveaux employés à la base de données.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="new-employee-first-name">Prénom *</Label>
+              <Input 
+                id="new-employee-first-name" 
+                placeholder="Prénom" 
+                value={newEmployee.first_name}
+                onChange={(e) => setNewEmployee(prev => ({ ...prev, first_name: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-employee-last-name">Nom *</Label>
+              <Input 
+                id="new-employee-last-name" 
+                placeholder="Nom" 
+                value={newEmployee.last_name}
+                onChange={(e) => setNewEmployee(prev => ({ ...prev, last_name: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="new-employee-department">Département *</Label>
+              <Select value={newEmployee.department} onValueChange={(value) => setNewEmployee(prev => ({ ...prev, department: value }))}>
+                <SelectTrigger id="new-employee-department">
+                  <SelectValue placeholder="Sélectionner un département" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Informatique">Informatique</SelectItem>
+                  <SelectItem value="RH">Ressources Humaines</SelectItem>
+                  <SelectItem value="Comptabilité">Comptabilité</SelectItem>
+                  <SelectItem value="Marketing">Marketing</SelectItem>
+                  <SelectItem value="Commercial">Commercial</SelectItem>
+                  <SelectItem value="Production">Production</SelectItem>
+                  <SelectItem value="Maintenance">Maintenance</SelectItem>
+                  <SelectItem value="Direction">Direction</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="new-employee-position">Poste</Label>
+              <Input 
+                id="new-employee-position" 
+                placeholder="Poste (optionnel)" 
+                value={newEmployee.position}
+                onChange={(e) => setNewEmployee(prev => ({ ...prev, position: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="new-employee-email">Email</Label>
+              <Input 
+                id="new-employee-email" 
+                type="email" 
+                placeholder="email@exemple.com (optionnel)" 
+                value={newEmployee.email}
+                onChange={(e) => setNewEmployee(prev => ({ ...prev, email: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-employee-phone">Téléphone</Label>
+              <Input 
+                id="new-employee-phone" 
+                type="tel" 
+                placeholder="Téléphone (optionnel)" 
+                value={newEmployee.phone}
+                onChange={(e) => setNewEmployee(prev => ({ ...prev, phone: e.target.value }))}
+              />
+            </div>
+          </div>
+          <Button 
+            onClick={handleCreateEmployee} 
+            disabled={createEmployee.isPending}
+          >
+            {createEmployee.isPending ? 'Création...' : 'Ajouter un employé'}
+          </Button>
         </CardContent>
       </Card>
 

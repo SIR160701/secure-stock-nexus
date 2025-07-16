@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.chat-gpt-enhanced]
 verify_jwt = false
+
+[functions.send-maintenance-email]
+verify_jwt = false

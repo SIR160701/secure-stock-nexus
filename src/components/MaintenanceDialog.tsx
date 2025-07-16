@@ -16,6 +16,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityHistory } from '@/hooks/useActivityHistory';
+import { useUsers } from '@/hooks/useUsers';
+import { supabase } from '@/integrations/supabase/client';
 
 const maintenanceSchema = z.object({
   problem: z.string().min(1, 'Le problème est requis'),
@@ -45,6 +47,7 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
 }) => {
   const { toast } = useToast();
   const { addActivity } = useActivityHistory();
+  const { users } = useUsers();
   
   const {
     register,
@@ -80,20 +83,43 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
   }, [initialData, setValue]);
 
   const handleFormSubmit = async (data: MaintenanceFormData) => {
-    onSubmit({ ...data, id: initialData?.id });
-    
-    addActivity.mutate({
-      action: mode === 'create' ? 'Création' : 'Modification',
-      description: `Maintenance ${mode === 'create' ? 'créée' : 'modifiée'}`,
-      page: 'Maintenance'
-    });
+    try {
+      await onSubmit({ ...data, id: initialData?.id });
+      
+      // Envoyer un email au technicien si assigné
+      if (data.technician && mode === 'create') {
+        const selectedUser = users.find(u => u.id === data.technician);
+        if (selectedUser && selectedUser.email) {
+          try {
+            await supabase.functions.invoke('send-maintenance-email', {
+              body: {
+                technicianEmail: selectedUser.email,
+                technicianName: selectedUser.full_name || selectedUser.email,
+                equipmentName: initialData?.item || 'Équipement non spécifié',
+                parkNumber: initialData?.parkNumber || '',
+                serialNumber: initialData?.serialNumber || '',
+                description: data.problem,
+                priority: data.priority,
+                scheduledDate: data.startDate.toISOString()
+              }
+            });
+          } catch (emailError) {
+            console.error('Erreur lors de l\'envoi de l\'email:', emailError);
+          }
+        }
+      }
+      
+      addActivity.mutate({
+        action: mode === 'create' ? 'Création' : 'Modification',
+        description: `Maintenance ${mode === 'create' ? 'créée' : 'modifiée'}`,
+        page: 'Maintenance'
+      });
 
-    toast({
-      title: mode === 'create' ? 'Maintenance créée' : 'Maintenance modifiée',
-      description: `La maintenance a été ${mode === 'create' ? 'créée' : 'modifiée'} avec succès.`,
-    });
-    reset();
-    onClose();
+      reset();
+      onClose();
+    } catch (error) {
+      console.error("Erreur lors de la soumission:", error);
+    }
   };
 
   const handleClose = () => {
@@ -130,11 +156,18 @@ export const MaintenanceDialog: React.FC<MaintenanceDialogProps> = ({
 
           <div>
             <Label htmlFor="technician">Technicien assigné *</Label>
-            <Input
-              id="technician"
-              placeholder="Ex: Jean Technicien"
-              {...register('technician')}
-            />
+            <Select onValueChange={(value) => setValue('technician', value)} defaultValue={initialData?.technician || ''}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner un technicien" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.full_name || user.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {errors.technician && (
               <p className="text-sm text-red-500 mt-1">{errors.technician.message}</p>
             )}

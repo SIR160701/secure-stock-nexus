@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEmployees, Employee } from '@/hooks/useEmployees';
 import { useEquipmentAssignments } from '@/hooks/useEquipmentAssignments';
 import { useStock } from '@/hooks/useStock';
@@ -186,16 +187,27 @@ const EmployeeDialog: React.FC<EmployeeDialogProps> = ({ isOpen, onClose, employ
               </div>
             </div>
             
-            <div>
-              <Label htmlFor="department">Département *</Label>
-              <Input
-                id="department"
-                value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                placeholder="Ex: Informatique, RH, Comptabilité..."
-                required
-              />
-            </div>
+                <div>
+                  <Label htmlFor="department">Département *</Label>
+                  <Select 
+                    value={formData.department} 
+                    onValueChange={(value) => setFormData({ ...formData, department: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un département" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Informatique">Informatique</SelectItem>
+                      <SelectItem value="RH">Ressources Humaines</SelectItem>
+                      <SelectItem value="Comptabilité">Comptabilité</SelectItem>
+                      <SelectItem value="Marketing">Marketing</SelectItem>
+                      <SelectItem value="Commercial">Commercial</SelectItem>
+                      <SelectItem value="Production">Production</SelectItem>
+                      <SelectItem value="Maintenance">Maintenance</SelectItem>
+                      <SelectItem value="Direction">Direction</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">

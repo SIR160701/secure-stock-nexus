@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface ActivityRecord {
   id: string;
@@ -15,6 +16,7 @@ export interface ActivityRecord {
 export const useActivityHistory = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { data: activities = [], isLoading } = useQuery({
     queryKey: ['activity-history'],
@@ -36,7 +38,7 @@ export const useActivityHistory = () => {
         .from('activity_history')
         .insert([{
           ...activity,
-          user_id: 'system'
+          user_id: user?.id || 'system'
         }])
         .select()
         .single();
