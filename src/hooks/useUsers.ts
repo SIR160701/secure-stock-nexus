@@ -30,15 +30,26 @@ export const useUsers = () => {
 
   const createUser = useMutation({
     mutationFn: async (userData: { email: string; password: string; full_name: string; role: string }) => {
-      // Create user profile directly (auth user will be created by signup)
+      // First create the user in auth
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: userData.email,
+        password: userData.password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: userData.full_name
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Then update the profile with the role
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .insert({ 
-          id: crypto.randomUUID(),
-          email: userData.email,
+        .update({ 
           full_name: userData.full_name,
           role: userData.role 
         })
+        .eq('id', authData.user.id)
         .select()
         .single();
 
@@ -64,11 +75,8 @@ export const useUsers = () => {
 
   const deleteUser = useMutation({
     mutationFn: async (userId: string) => {
-      // Delete from profiles table
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
+      // Delete from auth (this will cascade to profiles due to trigger)
+      const { error } = await supabase.auth.admin.deleteUser(userId);
       if (error) throw error;
     },
     onSuccess: () => {
