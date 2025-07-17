@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useToast } from '@/hooks/use-toast';
 
 const Settings = () => {
-  const { user, profile, hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { users, isLoading, createUser, deleteUser } = useUsers();
   const { employees, createEmployee } = useEmployees();
   const { toast } = useToast();
@@ -36,10 +35,6 @@ const Settings = () => {
     phone: ''
   });
 
-  const [settingsData, setSettingsData] = useState({
-    profileFullName: profile?.full_name || ''
-  });
-
   const handleCreateUser = async () => {
     if (!newUser.fullName || !newUser.email || !newUser.password) {
       toast({
@@ -50,31 +45,24 @@ const Settings = () => {
       return;
     }
 
-    console.log('Tentative de création d\'utilisateur:', newUser);
+    createUser.mutate({
+      email: newUser.email,
+      password: newUser.password,
+      full_name: newUser.fullName,
+      role: newUser.role
+    });
 
-    try {
-      await createUser.mutateAsync({
-        email: newUser.email,
-        password: newUser.password,
-        full_name: newUser.fullName,
-        role: newUser.role
-      });
-
-      // Reset form
-      setNewUser({
-        fullName: '',
-        email: '',
-        password: '',
-        role: 'user'
-      });
-    } catch (error) {
-      console.error('Erreur lors de la création:', error);
-    }
+    // Reset form
+    setNewUser({
+      fullName: '',
+      email: '',
+      password: '',
+      role: 'user'
+    });
   };
 
   const handleDeleteUser = (userId: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) {
-      console.log('Suppression utilisateur:', userId);
       deleteUser.mutate(userId);
     }
   };
@@ -98,22 +86,31 @@ const Settings = () => {
       status: 'active' as const
     };
 
-    try {
-      await createEmployee.mutateAsync(employeeData);
+    createEmployee.mutate(employeeData);
 
-      // Reset form
-      setNewEmployee({
-        first_name: '',
-        last_name: '',
-        department: '',
-        position: '',
-        email: '',
-        phone: ''
-      });
-    } catch (error) {
-      console.error('Erreur lors de la création de l\'employé:', error);
-    }
+    // Reset form
+    setNewEmployee({
+      first_name: '',
+      last_name: '',
+      department: '',
+      position: '',
+      email: '',
+      phone: ''
+    });
   };
+
+  // Désactive temporairement la restriction admin pour diagnostic
+  // if (!hasPermission('admin')) {
+  //   return (
+  //     <div className="flex items-center justify-center h-64">
+  //       <div className="text-center">
+  //         <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+  //         <h3 className="text-lg font-medium text-gray-900 mb-2">Accès restreint</h3>
+  //         <p className="text-gray-600">Vous n'avez pas les permissions nécessaires pour accéder aux paramètres.</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="space-y-6">

@@ -18,47 +18,32 @@ export const useActivityHistory = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  const { data: activities = [], isLoading, error } = useQuery({
+  const { data: activities = [], isLoading } = useQuery({
     queryKey: ['activity-history'],
     queryFn: async () => {
-      console.log('Récupération de l\'historique des activités...');
-      
       const { data, error } = await supabase
         .from('activity_history')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(10);
       
-      if (error) {
-        console.error('Erreur lors de la récupération de l\'historique:', error);
-        throw error;
-      }
-      
-      console.log('Historique récupéré:', data);
+      if (error) throw error;
       return data as ActivityRecord[];
     },
   });
 
   const addActivity = useMutation({
     mutationFn: async (activity: { action: string; description: string; page: string }) => {
-      const currentUserId = user?.id || 'anonymous';
-      console.log('Ajout d\'activité:', { ...activity, user_id: currentUserId });
-      
       const { data, error } = await supabase
         .from('activity_history')
         .insert([{
           ...activity,
-          user_id: currentUserId
+          user_id: user?.id || 'anonymous'
         }])
         .select()
         .single();
       
-      if (error) {
-        console.error('Erreur lors de l\'ajout de l\'activité:', error);
-        throw error;
-      }
-      
-      console.log('Activité ajoutée avec succès:', data);
+      if (error) throw error;
       return data;
     },
     onSuccess: (data, variables) => {
@@ -68,15 +53,11 @@ export const useActivityHistory = () => {
         description: variables.description,
       });
     },
-    onError: (error) => {
-      console.error('Erreur lors de l\'ajout de l\'activité:', error);
-    },
   });
 
   return {
     activities,
     isLoading,
-    error,
     addActivity,
   };
 };

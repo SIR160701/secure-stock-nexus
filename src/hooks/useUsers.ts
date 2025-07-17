@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,19 +23,14 @@ export const useUsers = () => {
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (error) {
-        console.error('Erreur lors de la récupération des utilisateurs:', error);
-        throw error;
-      }
+      if (error) throw error;
       return data as User[];
     },
   });
 
   const createUser = useMutation({
     mutationFn: async (userData: { email: string; password: string; full_name: string; role: string }) => {
-      console.log('Création utilisateur:', userData);
-      
-      // Créer un profil utilisateur directement dans la table profiles
+      // Create user profile directly (auth user will be created by signup)
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .insert({ 
@@ -48,12 +42,8 @@ export const useUsers = () => {
         .select()
         .single();
 
-      if (profileError) {
-        console.error('Erreur création profil:', profileError);
-        throw profileError;
-      }
+      if (profileError) throw profileError;
       
-      console.log('Profil créé avec succès:', profileData);
       return profileData;
     },
     onSuccess: () => {
@@ -64,7 +54,6 @@ export const useUsers = () => {
       });
     },
     onError: (error) => {
-      console.error('Erreur lors de la création:', error);
       toast({
         title: "Erreur",
         description: "Erreur lors de la création de l'utilisateur.",
@@ -75,20 +64,12 @@ export const useUsers = () => {
 
   const deleteUser = useMutation({
     mutationFn: async (userId: string) => {
-      console.log('Suppression utilisateur:', userId);
-      
-      // Supprimer le profil de la table profiles
+      // Delete from profiles table
       const { error } = await supabase
         .from('profiles')
         .delete()
         .eq('id', userId);
-      
-      if (error) {
-        console.error('Erreur suppression profil:', error);
-        throw error;
-      }
-      
-      console.log('Profil supprimé avec succès');
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -98,46 +79,9 @@ export const useUsers = () => {
       });
     },
     onError: (error) => {
-      console.error('Erreur lors de la suppression:', error);
       toast({
         title: "Erreur",
         description: "Erreur lors de la suppression de l'utilisateur.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateProfile = useMutation({
-    mutationFn: async ({ userId, updates }: { userId: string; updates: { full_name?: string; role?: string } }) => {
-      console.log('Mise à jour profil:', userId, updates);
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', userId)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Erreur mise à jour profil:', error);
-        throw error;
-      }
-      
-      console.log('Profil mis à jour avec succès:', data);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({
-        title: "Profil mis à jour",
-        description: "Le profil a été mis à jour avec succès.",
-      });
-    },
-    onError: (error) => {
-      console.error('Erreur lors de la mise à jour:', error);
-      toast({
-        title: "Erreur",
-        description: "Erreur lors de la mise à jour du profil.",
         variant: "destructive",
       });
     },
@@ -149,6 +93,5 @@ export const useUsers = () => {
     error,
     createUser,
     deleteUser,
-    updateProfile,
   };
 };
