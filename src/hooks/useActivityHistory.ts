@@ -38,7 +38,7 @@ export const useActivityHistory = () => {
         .from('activity_history')
         .insert([{
           ...activity,
-          user_id: user?.id || 'system'
+          user_id: user?.id || 'anonymous'
         }])
         .select()
         .single();
